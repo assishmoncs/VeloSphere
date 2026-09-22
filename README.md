@@ -1,5 +1,6 @@
 # VeloSphere
 
+[![Build Status](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml/badge.svg)](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml)
 [![Android](https://img.shields.io/badge/Platform-Android_24%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
 [![OpenGL ES](https://img.shields.io/badge/Graphics-OpenGL_ES_3.0-5586A4?style=for-the-badge&logo=opengl&logoColor=white)](https://www.khronos.org/opengles/)
 [![C++17](https://img.shields.io/badge/Language-C%2B%2B17-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)](https://en.cppreference.com/w/cpp/17)
@@ -77,8 +78,9 @@ VeloSphere/
 │   │   │   ├── Mesh.h                # Procedural Sphere, Box, Track, Quad & HUD font engine
 │   │   │   ├── Shader.h              # GLES 3.0 shader compilation & procedural GLSL programs
 │   │   │   └── main.cpp              # EGL context, android_main loop, input & persistence
-│   │   ├── java/.../MainActivity.kt  # Thin GameActivity wrapper with immersive fullscreen mode
-│   │   ├── res/                      # App resources, icons, and themes
+│   │   ├── java/com/hsissa/velosphere/
+│   │   │   └── MainActivity.kt       # GameActivity wrapper with background music & fullscreen mode
+│   │   ├── res/                      # App resources, raw audio, icons, and themes
 │   │   └── AndroidManifest.xml       # Manifest specifying GLES 3.0 & touchscreen requirements
 │   └── build.gradle.kts              # App module build configuration
 ├── .github/workflows/
@@ -116,7 +118,7 @@ VeloSphere/
 ### Option 2: Command Line (Gradle)
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/VeloSphere.git
+git clone https://github.com/assishmoncs/VeloSphere.git
 cd VeloSphere
 
 # Build the Debug APK
@@ -130,7 +132,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome. Feel free to check the [issues page](https://github.com/<your-username>/VeloSphere/issues).
+Contributions, issues, and feature requests are welcome. Feel free to check the [issues page](https://github.com/assishmoncs/VeloSphere/issues).
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/YourFeature`)
