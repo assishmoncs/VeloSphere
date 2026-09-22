@@ -23,12 +23,20 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Set up Android SDK & NDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+          accept-android-sdk-licenses: true
 
-      - name: Install NDK & CMake
+      - name: Install Android Build Dependencies
         run: |
-          sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1"
 
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
