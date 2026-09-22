@@ -1,0 +1,72 @@
+# ==============================================================================
+# VeloSphere - Git Ignore Configuration
+# Comprehensive ignore rules for Android Studio, Gradle, NDK/CMake & OS files
+# ==============================================================================
+
+# Built application packages and binaries
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Built native libraries
+*.so
+
+# Gradle cache and build outputs
+.gradle/
+build/
+app/build/
+**/build/
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+captures/
+.navigation/
+
+# Android NDK / CMake build artifacts
+.cxx/
+app/.cxx/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json
+**/*.ninja
+**/*.ninja_deps
+**/*.ninja_log
+
+# Local configuration file (contains absolute machine SDK paths)
+local.properties
+
+# Signing and keystore files
+*.jks
+*.keystore
+release-key.properties
+signing.properties
+
+# Google Services / Crashlytics / Analytics configuration
+google-services.json
+
+# Log files
+*.log
+*.log.*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Temporary planner artifacts
+artifacts/
+scratch/
+tmp/
+temp/
