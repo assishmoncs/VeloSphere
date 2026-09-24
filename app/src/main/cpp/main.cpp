@@ -328,12 +328,36 @@ public:
             shader.set_emission(0.85f);
             rail_mesh.draw();
 
+            // Two ground dividers make the three playable lanes visually explicit.
+            const float lane_divider_x = TreadmillSystem::LANE_WIDTH * 0.5f;
+            const float lane_divider_y = 0.018f;
+
+            Mat4 model_left_divider =
+                Mat4::translate(-lane_divider_x, lane_divider_y, seg.z_position) *
+                Mat4::scale(0.045f, 0.025f, TreadmillSystem::SEGMENT_SPACING * 0.90f);
+            shader.set_model(model_left_divider);
+            shader.set_mvp(vp * model_left_divider);
+            shader.set_shading_mode(0);
+            shader.set_color(0.02f, 0.40f, 0.55f, 1.0f);
+            shader.set_emission(0.30f);
+            box_mesh.draw();
+
+            Mat4 model_right_divider =
+                Mat4::translate(lane_divider_x, lane_divider_y, seg.z_position) *
+                Mat4::scale(0.045f, 0.025f, TreadmillSystem::SEGMENT_SPACING * 0.90f);
+            shader.set_model(model_right_divider);
+            shader.set_mvp(vp * model_right_divider);
+            shader.set_color(0.02f, 0.40f, 0.55f, 1.0f);
+            shader.set_emission(0.30f);
+            box_mesh.draw();
+
             // -----------------------------------------------------------------
-            // 2. RENDER RECTANGULAR OBSTACLES WITH HOVER OSCILLATION
+            // 2. RENDER SINGLE-LANE OBSTACLES
             // -----------------------------------------------------------------
             if (seg.has_obstacle) {
+                // obstacle_x_offset is always a legal three-lane position.
                 Mat4 model_box =
-                    Mat4::translate(seg.obstacle_x_offset, seg.obstacle_height * 0.5f + seg.hover_y, seg.z_position) *
+                    Mat4::translate(seg.obstacle_x_offset, seg.obstacle_height * 0.5f, seg.z_position) *
                     Mat4::scale(seg.obstacle_width, seg.obstacle_height, seg.obstacle_depth);
 
                 shader.set_model(model_box);
