@@ -36,6 +36,12 @@
   - **Aerodynamic Banking Tilt**: Smooth marble leaning into sharp steering turns with spring inertia.
   - **Track Contact Suspension**: Subtle vertical micro-vibration based on surface contact and ground speed.
 
+- **Three-Lane Obstacle System**:
+  - Explicit three-lane runway with two glowing lane dividers.
+  - Every obstacle is fixed to one of the three lane centers and uses fixed dimensions, preventing accidental multi-lane coverage.
+  - Moving hazards perform a deterministic single lane-to-adjacent-lane transition, then lock into the destination lane before reaching the player.
+  - Obstacle motion is distance-based rather than frame/random-position based, keeping behavior consistent across frame rates and speeds.
+
 - **Impact Rebound & Particle Simulation**:
   - Collisions trigger full physical velocity rebound, gravity drops, elastic track bounces, and 3D tumbling rotation.
   - Particle engine simulating 64 radial neon fire sparks upon collision, plus friction sparks on high-speed lateral drift.
