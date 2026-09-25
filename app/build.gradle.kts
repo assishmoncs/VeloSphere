@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "com.hsissa.velosphere"
-    compileSdk = 36
+    compileSdk = 35
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.hsissa.velosphere"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 2
         versionName = "1.1"
 
@@ -72,8 +72,8 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-splashscreen:1.2.0")
-    implementation("androidx.games:games-activity:4.4.2")
-    implementation("androidx.core:core-ktx:1.19.1")
-    implementation("androidx.appcompat:appcompat:1.8.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.games:games-activity:3.0.5")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }
