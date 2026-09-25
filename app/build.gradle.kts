@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.hsissa.velosphere"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hsissa.velosphere"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 2
         versionName = "1.1"
 
@@ -18,7 +18,9 @@ android {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
 
-        externalNativeBuild {
+        ndkVersion = "26.1.10909125"
+
+    externalNativeBuild {
             cmake {
                 arguments.addAll(
                     listOf(
@@ -66,13 +68,14 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
+            // Keep the existing NDK to avoid changing the native toolchain.
         }
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("androidx.games:games-activity:3.0.5")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("androidx.games:games-activity:4.4.2")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
 }
