@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.hsissa.velosphere"
     compileSdk = 36
+    ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.hsissa.velosphere"
@@ -18,9 +19,7 @@ android {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
 
-        ndkVersion = "26.1.10909125"
-
-    externalNativeBuild {
+        externalNativeBuild {
             cmake {
                 arguments.addAll(
                     listOf(
@@ -68,7 +67,6 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
-            // Keep the existing NDK to avoid changing the native toolchain.
         }
     }
 }
