@@ -47,7 +47,7 @@ class MainActivity : GameActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemUI()
-        if (mediaPlayer != null && !mediaPlayer!!.isPlaying) {
+        if (mediaPlayer?.isPlaying == false) {
             mediaPlayer?.start()
         }
     }

@@ -7,8 +7,8 @@
 #include <game-activity/GameActivity.h>
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 
-// Android Native App Glue implementation
-#include <game-activity/native_app_glue/android_native_app_glue.c>
+// android_native_app_glue is compiled into game-activity_static library
+
 
 // Register GameActivity native methods
 extern "C" {
