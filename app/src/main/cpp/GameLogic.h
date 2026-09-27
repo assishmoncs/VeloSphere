@@ -211,14 +211,6 @@ public:
         const float z_disp = global_speed_ * dt;
         distance_traveled_ += z_disp;
 
-        float speed_ratio = (global_speed_ - BASE_SPEED) / (MAX_SPEED - BASE_SPEED);
-        float speed_mult = 1.0f + std::clamp(speed_ratio, 0.0f, 1.0f) * 1.5f;
-        score_ = static_cast<int>(distance_traveled_ * 1.5f * speed_mult) + bonus_score_;
-
-        if (best_score_ > 0 && score_ > best_score_) {
-            has_new_best_ = true;
-        }
-
         for (auto& segment : segments_) {
             segment.z_position -= z_disp;
 
@@ -255,6 +247,16 @@ public:
                     }
                 }
             }
+        }
+
+        // Calculate score after obstacle clearance so +100 dodge bonuses
+        // are reflected immediately in the same update frame.
+        float speed_ratio = (global_speed_ - BASE_SPEED) / (MAX_SPEED - BASE_SPEED);
+        float speed_mult = 1.0f + std::clamp(speed_ratio, 0.0f, 1.0f) * 1.5f;
+        score_ = static_cast<int>(distance_traveled_ * 1.5f * speed_mult) + bonus_score_;
+
+        if (best_score_ > 0 && score_ > best_score_) {
+            has_new_best_ = true;
         }
 
         if (last_bonus_display_timer_ > 0.0f) {
