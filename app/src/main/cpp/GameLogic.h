@@ -319,18 +319,15 @@ private:
         // Keep at least one full segment clear between hazards. This gives the
         // player a consistent reaction window instead of back-to-back obstacles.
         bool obstacle_too_close = false;
-        float nearest_obstacle_z = -1000.0f;
 
         for (const auto& other : segments_) {
             if (&other == &seg || !other.has_obstacle) continue;
-            if (other.z_position > seg.z_position && other.z_position > nearest_obstacle_z) {
-                nearest_obstacle_z = other.z_position;
-            }
-        }
 
-        if (nearest_obstacle_z > seg.z_position &&
-            nearest_obstacle_z - seg.z_position < MIN_OBSTACLE_GAP) {
-            obstacle_too_close = true;
+            const float gap = std::fabs(other.z_position - seg.z_position);
+            if (gap < MIN_OBSTACLE_GAP) {
+                obstacle_too_close = true;
+                break;
+            }
         }
 
         seg.has_obstacle = !obstacle_too_close && (dist_prob_(rng_) > 0.30f);
