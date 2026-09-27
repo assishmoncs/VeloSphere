@@ -147,6 +147,7 @@ class TreadmillSystem {
 public:
     static constexpr size_t POOL_SIZE           = 8;
     static constexpr float  SEGMENT_SPACING     = 10.0f;
+    static constexpr float  MIN_OBSTACLE_GAP    = 20.0f;
     static constexpr float  DESPAWN_THRESHOLD_Z = -10.0f;
     static constexpr float  BASE_SPEED          = 18.0f;
     static constexpr float  SPEED_ACCELERATION  = 0.55f;
@@ -308,13 +309,31 @@ private:
     }
 
     void setup_segment(PathSegment& seg) {
-        seg.has_obstacle = (dist_prob_(rng_) > 0.30f);
         seg.cleared = false;
         seg.hover_y = 0.0f;
         seg.motion_distance = 0.0f;
         seg.obstacle_width = OBSTACLE_WIDTH;
         seg.obstacle_height = OBSTACLE_HEIGHT;
         seg.obstacle_depth = OBSTACLE_DEPTH;
+
+        // Keep at least one full segment clear between hazards. This gives the
+        // player a consistent reaction window instead of back-to-back obstacles.
+        bool obstacle_too_close = false;
+        float nearest_obstacle_z = -1000.0f;
+
+        for (const auto& other : segments_) {
+            if (&other == &seg || !other.has_obstacle) continue;
+            if (other.z_position > seg.z_position && other.z_position > nearest_obstacle_z) {
+                nearest_obstacle_z = other.z_position;
+            }
+        }
+
+        if (nearest_obstacle_z > seg.z_position &&
+            nearest_obstacle_z - seg.z_position < MIN_OBSTACLE_GAP) {
+            obstacle_too_close = true;
+        }
+
+        seg.has_obstacle = !obstacle_too_close && (dist_prob_(rng_) > 0.30f);
 
         if (!seg.has_obstacle) {
             seg.lane = TrackLane::CENTER;
