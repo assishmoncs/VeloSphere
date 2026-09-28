@@ -172,7 +172,6 @@ public:
 
     TreadmillSystem()
         : rng_(std::random_device{}()),
-          dist_lane_(0, 2),
           dist_prob_(0.0f, 1.0f) {
         reset();
     }
@@ -184,6 +183,7 @@ public:
         bonus_score_ = 0;
         last_bonus_display_timer_ = 0.0f;
         has_new_best_ = false;
+        pattern_index_ = 0;
 
         for (size_t i = 0; i < POOL_SIZE; ++i) {
             segments_[i].z_position = static_cast<float>(i) * SEGMENT_SPACING;
@@ -298,6 +298,21 @@ private:
         }
     }
 
+    static TrackLane pattern_lane(size_t index) {
+        // Lane patterns are applied to successive obstacle spawns. Because
+        // MIN_OBSTACLE_GAP already enforces a clear segment between hazards,
+        // these patterns create readable left/center/right weaving rather than
+        // random lane jumps.
+        static constexpr std::array<std::array<TrackLane, 4>, 3> PATTERNS = {{
+            {{TrackLane::LEFT,   TrackLane::CENTER, TrackLane::RIGHT, TrackLane::CENTER}},
+            {{TrackLane::RIGHT,  TrackLane::CENTER, TrackLane::LEFT,   TrackLane::CENTER}},
+            {{TrackLane::LEFT,   TrackLane::RIGHT,  TrackLane::CENTER, TrackLane::RIGHT}}
+        }};
+        constexpr size_t PATTERN_LENGTH = 4;
+        constexpr size_t PATTERN_COUNT = 3;
+        return PATTERNS[(index / PATTERN_LENGTH) % PATTERN_COUNT][index % PATTERN_LENGTH];
+    }
+
     static TrackLane moving_target_for(TrackLane lane) {
         // Moving hazards only cross one lane boundary at a time.
         switch (lane) {
@@ -340,7 +355,7 @@ private:
             return;
         }
 
-        seg.lane = static_cast<TrackLane>(dist_lane_(rng_));
+        seg.lane = pattern_lane(pattern_index_++);
         seg.obstacle_x_offset = lane_x(seg.lane);
 
         // Moving hazards appear later in the run, but their movement itself
@@ -364,8 +379,8 @@ private:
     bool  has_new_best_{false};
 
     std::mt19937 rng_;
-    std::uniform_int_distribution<int> dist_lane_;
     std::uniform_real_distribution<float> dist_prob_;
+    size_t pattern_index_{0};
 };
 
 // =============================================================================
