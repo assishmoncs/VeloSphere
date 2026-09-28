@@ -355,7 +355,9 @@ private:
         // Their movement spans the full track from left lane to right lane. 
         if (global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
             seg.is_moving = true;
+            seg.lane = TrackLane::LEFT;
             seg.motion_target_lane = TrackLane::RIGHT;
+            seg.obstacle_x_offset = LEFT_LANE_X;
         } else {
             seg.is_moving = false;
             seg.motion_target_lane = seg.lane;
