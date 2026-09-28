@@ -358,15 +358,10 @@ private:
         seg.lane = pattern_lane(pattern_index_++);
         seg.obstacle_x_offset = lane_x(seg.lane);
 
-        // Moving hazards appear later in the run, but their movement itself
-        // is completely deterministic after they spawn.
-        if (global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
-            seg.is_moving = true;
-            seg.motion_target_lane = moving_target_for(seg.lane);
-        } else {
-            seg.is_moving = false;
-            seg.motion_target_lane = seg.lane;
-        }
+        // Every spawned obstacle is a moving yellow hazard.
+        // Movement remains deterministic and lane-constrained.
+        seg.is_moving = true;
+        seg.motion_target_lane = moving_target_for(seg.lane);
     }
 
     std::array<PathSegment, POOL_SIZE> segments_{};
