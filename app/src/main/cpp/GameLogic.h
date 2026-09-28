@@ -35,10 +35,10 @@ struct PathSegment {
     float obstacle_height{1.50f};
     float obstacle_depth{1.00f};
 
-    // Moving-hazard state. Motion is deterministic: hold in the source lane,
-    // make one smooth lane change, then stay locked in the destination lane.
+    // Moving-hazard state. Yellow hazards smoothly travel between their two
+    // assigned lane endpoints and continuously reverse direction.
     bool  is_moving{false};
-    float motion_distance{0.0f};
+    float motion_phase{0.0f};
 
     // Kept as a rendering/collision compatibility field; obstacle vertical
     // position is intentionally fixed at ground level.
@@ -164,11 +164,9 @@ public:
     static constexpr float OBSTACLE_HEIGHT = 1.50f;
     static constexpr float OBSTACLE_DEPTH  = 1.00f;
 
-    // Moving hazards follow a distance-based, deterministic lane change.
-    // This keeps the motion independent of frame rate and still predictable
-    // at higher game speeds.
-    static constexpr float MOVING_HOLD_DISTANCE       = 5.0f;
-    static constexpr float MOVING_TRANSITION_DISTANCE = 8.0f;
+    // One-way travel time between the two lane endpoints for a moving
+    // (yellow) hazard. The motion loops continuously and uses smoothstep.
+    static constexpr float MOVING_HALF_CYCLE_TIME = 0.85f;
 
     TreadmillSystem()
         : rng_(std::random_device{}()),
@@ -191,7 +189,7 @@ public:
             segments_[i].obstacle_height = OBSTACLE_HEIGHT;
             segments_[i].obstacle_depth = OBSTACLE_DEPTH;
             segments_[i].is_moving = false;
-            segments_[i].motion_distance = 0.0f;
+            segments_[i].motion_phase = 0.0f;
             segments_[i].hover_y = 0.0f;
             segments_[i].cleared = false;
 
@@ -224,29 +222,22 @@ public:
             segment.hover_y = 0.0f;
 
             if (segment.is_moving && segment.has_obstacle) {
-                segment.motion_distance += z_disp;
+                segment.motion_phase += dt / MOVING_HALF_CYCLE_TIME;
+                if (segment.motion_phase >= 2.0f) {
+                    segment.motion_phase -= 2.0f;
+                }
 
                 const float from_x = lane_x(segment.lane);
                 const float target_x = lane_x(segment.motion_target_lane);
 
-                if (segment.motion_distance <= MOVING_HOLD_DISTANCE) {
-                    segment.obstacle_x_offset = from_x;
-                } else {
-                    const float transition_progress =
-                        (segment.motion_distance - MOVING_HOLD_DISTANCE) / MOVING_TRANSITION_DISTANCE;
+                // Ping-pong between the two endpoints:
+                // 0 -> 1 -> 0, with smooth acceleration/deceleration.
+                const float cycle = segment.motion_phase;
+                const float progress = (cycle <= 1.0f) ? cycle : (2.0f - cycle);
+                const float eased_t = progress * progress * (3.0f - 2.0f * progress);
 
-                    if (transition_progress >= 1.0f) {
-                        // Once the lane change is complete, lock the hazard
-                        // into the destination lane before it reaches the player.
-                        segment.obstacle_x_offset = target_x;
-                    } else {
-                        const float t = std::clamp(transition_progress, 0.0f, 1.0f);
-                        // Smoothstep gives a deliberate, readable acceleration/deceleration.
-                        const float eased_t = t * t * (3.0f - 2.0f * t);
-                        segment.obstacle_x_offset =
-                            from_x + (target_x - from_x) * eased_t;
-                    }
-                }
+                segment.obstacle_x_offset =
+                    from_x + (target_x - from_x) * eased_t;
             }
         }
 
@@ -326,7 +317,7 @@ private:
     void setup_segment(PathSegment& seg) {
         seg.cleared = false;
         seg.hover_y = 0.0f;
-        seg.motion_distance = 0.0f;
+        seg.motion_phase = 0.0f;
         seg.obstacle_width = OBSTACLE_WIDTH;
         seg.obstacle_height = OBSTACLE_HEIGHT;
         seg.obstacle_depth = OBSTACLE_DEPTH;
@@ -358,10 +349,15 @@ private:
         seg.lane = pattern_lane(pattern_index_++);
         seg.obstacle_x_offset = lane_x(seg.lane);
 
-        // Every spawned obstacle is a moving yellow hazard.
-        // Movement remains deterministic and lane-constrained.
-        seg.is_moving = true;
-        seg.motion_target_lane = moving_target_for(seg.lane);
+        // Only the hazards selected as moving are yellow. They continuously
+        // travel between their two lane endpoints.
+        if (global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
+            seg.is_moving = true;
+            seg.motion_target_lane = moving_target_for(seg.lane);
+        } else {
+            seg.is_moving = false;
+            seg.motion_target_lane = seg.lane;
+        }
     }
 
     std::array<PathSegment, POOL_SIZE> segments_{};
