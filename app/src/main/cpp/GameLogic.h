@@ -227,10 +227,12 @@ public:
                     segment.motion_phase -= 2.0f;
                 }
 
-                const float from_x = lane_x(segment.lane);
-                const float target_x = lane_x(segment.motion_target_lane);
+                // Yellow hazards sweep across the entire three-lane track:
+                // LEFT -> CENTER -> RIGHT -> CENTER -> LEFT ...
+                const float from_x = LEFT_LANE_X;
+                const float target_x = RIGHT_LANE_X;
 
-                // Ping-pong between the two endpoints:
+                // Ping-pong between the two outer lane endpoints:
                 // 0 -> 1 -> 0, with smooth acceleration/deceleration.
                 const float cycle = segment.motion_phase;
                 const float progress = (cycle <= 1.0f) ? cycle : (2.0f - cycle);
@@ -349,11 +351,11 @@ private:
         seg.lane = pattern_lane(pattern_index_++);
         seg.obstacle_x_offset = lane_x(seg.lane);
 
-        // Only the hazards selected as moving are yellow. They continuously
-        // travel between their two lane endpoints.
+        // Only the hazards selected as moving are yellow.
+        // Their movement spans the full track from left lane to right lane. 
         if (global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
             seg.is_moving = true;
-            seg.motion_target_lane = moving_target_for(seg.lane);
+            seg.motion_target_lane = TrackLane::RIGHT;
         } else {
             seg.is_moving = false;
             seg.motion_target_lane = seg.lane;
