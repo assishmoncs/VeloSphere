@@ -39,6 +39,7 @@ struct PathSegment {
     // assigned lane endpoints and continuously reverse direction.
     bool  is_moving{false};
     float motion_phase{0.0f};
+    float motion_warning_time{0.0f};
 
     // Kept as a rendering/collision compatibility field; obstacle vertical
     // position is intentionally fixed at ground level.
@@ -167,6 +168,7 @@ public:
     // One-way travel time between the two lane endpoints for a moving
     // (yellow) hazard. The motion loops continuously and uses smoothstep.
     static constexpr float MOVING_HALF_CYCLE_TIME = 1.10f;
+    static constexpr float MOVING_WARNING_TIME = 0.35f;
 
     TreadmillSystem()
         : rng_(std::random_device{}()),
@@ -190,6 +192,7 @@ public:
             segments_[i].obstacle_depth = OBSTACLE_DEPTH;
             segments_[i].is_moving = false;
             segments_[i].motion_phase = 0.0f;
+            segments_[i].motion_warning_time = 0.0f;
             segments_[i].hover_y = 0.0f;
             segments_[i].cleared = false;
 
@@ -222,6 +225,14 @@ public:
             segment.hover_y = 0.0f;
 
             if (segment.is_moving && segment.has_obstacle) {
+                // Brief warning hold at the left edge before the sweep begins.
+                if (segment.motion_warning_time > 0.0f) {
+                    segment.motion_warning_time =
+                        std::max(0.0f, segment.motion_warning_time - dt);
+                    segment.obstacle_x_offset = LEFT_LANE_X;
+                    continue;
+                }
+
                 segment.motion_phase += dt / MOVING_HALF_CYCLE_TIME;
                 if (segment.motion_phase >= 2.0f) {
                     segment.motion_phase -= 2.0f;
@@ -320,6 +331,7 @@ private:
         seg.cleared = false;
         seg.hover_y = 0.0f;
         seg.motion_phase = 0.0f;
+        seg.motion_warning_time = 0.0f;
         seg.obstacle_width = OBSTACLE_WIDTH;
         seg.obstacle_height = OBSTACLE_HEIGHT;
         seg.obstacle_depth = OBSTACLE_DEPTH;
@@ -358,6 +370,7 @@ private:
             seg.lane = TrackLane::LEFT;
             seg.motion_target_lane = TrackLane::RIGHT;
             seg.obstacle_x_offset = LEFT_LANE_X;
+            seg.motion_warning_time = MOVING_WARNING_TIME;
         } else {
             seg.is_moving = false;
             seg.motion_target_lane = seg.lane;
