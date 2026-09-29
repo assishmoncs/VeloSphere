@@ -166,7 +166,7 @@ public:
 
     // One-way travel time between the two lane endpoints for a moving
     // (yellow) hazard. The motion loops continuously and uses smoothstep.
-    static constexpr float MOVING_HALF_CYCLE_TIME = 0.85f;
+    static constexpr float MOVING_HALF_CYCLE_TIME = 1.10f;
 
     TreadmillSystem()
         : rng_(std::random_device{}()),
