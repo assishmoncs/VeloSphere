@@ -154,6 +154,7 @@ public:
     static constexpr size_t POOL_SIZE           = 8;
     static constexpr float  SEGMENT_SPACING     = 10.0f;
     static constexpr float  MIN_OBSTACLE_GAP    = 20.0f;
+    static constexpr float  MOVING_SAFETY_GAP   = 30.0f;
     static constexpr float  DESPAWN_THRESHOLD_Z = -10.0f;
     static constexpr float  BASE_SPEED          = 18.0f;
     static constexpr float  SPEED_ACCELERATION  = 0.55f;
