@@ -365,9 +365,20 @@ public:
                 shader.set_shading_mode(2); // Glowing hazard mode
 
                 if (seg.is_moving) {
-                    // Moving hazards: pulsing electric amber
-                    shader.set_color(1.0f, 0.65f, 0.0f, 1.0f);
-                    shader.set_emission(0.90f);
+                    // Moving hazards: amber. While the warning hold is active,
+                    // pulse the emission so the upcoming sweep is readable.
+                    if (seg.motion_warning_time > 0.0f) {
+                        const float warning_progress =
+                            1.0f - (seg.motion_warning_time / TreadmillSystem::MOVING_WARNING_TIME);
+                        const float pulse =
+                            0.75f + 0.25f * std::sin(warning_progress * 18.0f);
+
+                        shader.set_color(1.0f, 0.80f, 0.08f, 1.0f);
+                        shader.set_emission(1.0f + 0.70f * pulse);
+                    } else {
+                        shader.set_color(1.0f, 0.65f, 0.0f, 1.0f);
+                        shader.set_emission(0.90f);
+                    }
                 } else {
                     // Stationary hazards: glowing neon ruby
                     shader.set_color(1.0f, 0.12f, 0.38f, 1.0f);
