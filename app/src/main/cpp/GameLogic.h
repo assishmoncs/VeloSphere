@@ -363,9 +363,21 @@ private:
         seg.lane = pattern_lane(pattern_index_++);
         seg.obstacle_x_offset = lane_x(seg.lane);
 
+        // A full-track yellow sweep needs more breathing room than a
+        // stationary red obstacle. Do not spawn a moving hazard too close
+        // to any other obstacle.
+        bool moving_space_clear = true;
+        for (const auto& other : segments_) {
+            if (&other == &seg || !other.has_obstacle) continue;
+            if (std::fabs(other.z_position - seg.z_position) < MOVING_SAFETY_GAP) {
+                moving_space_clear = false;
+                break;
+            }
+        }
+
         // Only the hazards selected as moving are yellow.
-        // Their movement spans the full track from left lane to right lane. 
-        if (global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
+        // Their movement spans the full track from left lane to right lane.
+        if (moving_space_clear && global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
             seg.is_moving = true;
             seg.lane = TrackLane::LEFT;
             seg.motion_target_lane = TrackLane::RIGHT;
