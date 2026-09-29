@@ -54,6 +54,11 @@ public:
     static constexpr float TRACK_HALF_WIDTH = 3.8f;
     static constexpr float LATERAL_BOUND = TRACK_HALF_WIDTH - RADIUS - 0.2f;
 
+    // Steering tuning: responsive enough for quick lane changes without
+    // making the sphere snap unnaturally between lanes.
+    static constexpr float STEER_RESPONSE = 18.0f;
+    static constexpr float TOUCH_SENSITIVITY = 7.0f;
+
     Vec3  pos{0.0f, RADIUS, 0.0f};
     float target_x{0.0f};
     float roll_angle{0.0f};
@@ -91,7 +96,7 @@ public:
 
         float diff = target_x - pos.x;
         float prev_x = pos.x;
-        pos.x += diff * std::min(1.0f, 20.0f * dt);
+        pos.x += diff * std::min(1.0f, STEER_RESPONSE * dt);
 
         if (pos.x < -LATERAL_BOUND) pos.x = -LATERAL_BOUND;
         if (pos.x >  LATERAL_BOUND) pos.x =  LATERAL_BOUND;
@@ -138,7 +143,7 @@ public:
         tumble_ang_vel *= std::max(0.0f, 1.0f - 1.8f * dt);
     }
 
-    void apply_touch_delta(float delta_x_screenspace, float touch_sensitivity = 7.5f) {
+    void apply_touch_delta(float delta_x_screenspace, float touch_sensitivity = TOUCH_SENSITIVITY) {
         target_x += delta_x_screenspace * touch_sensitivity;
         target_x = std::clamp(target_x, -LATERAL_BOUND, LATERAL_BOUND);
     }
