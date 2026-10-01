@@ -456,12 +456,20 @@ public:
         snprintf(spd_str, sizeof(spd_str), "%d MPH", speed_mph);
         hud.draw_text(shader, ortho, pad, static_cast<float>(view_height) - 40.0f * base_scale, char_w * 0.9f, char_h * 0.9f, spd_str, 0.2f, 1.0f, 0.4f, 0.9f);
 
-        // Dodge bonus indicator
-        if (treadmill.get_bonus_timer() > 0.0f) {
-            float bonus_alpha = std::min(1.0f, treadmill.get_bonus_timer());
-            float bonus_x = static_cast<float>(view_width) * 0.5f - 60.0f * base_scale;
-            float bonus_y = 70.0f * base_scale + (1.2f - treadmill.get_bonus_timer()) * 15.0f * base_scale;
-            hud.draw_text(shader, ortho, bonus_x, bonus_y, char_w * 1.05f, char_h * 1.05f, "+100 DODGE!", 1.0f, 0.2f, 0.8f, bonus_alpha);
+        // Dodge milestone indicator: appears once for one second at
+        // 50, 100, 150... successful obstacle dodges.
+        if (treadmill.get_dodge_milestone_timer() > 0.0f) {
+            char dodge_msg[32];
+            snprintf(dodge_msg, sizeof(dodge_msg), "%d+ DODGES", treadmill.get_dodge_milestone());
+
+            float milestone_alpha = std::min(1.0f, treadmill.get_dodge_milestone_timer());
+            float text_width = static_cast<float>(strlen(dodge_msg)) * char_w * 1.12f;
+            float milestone_x = (static_cast<float>(view_width) - text_width) * 0.5f;
+            float milestone_y = 70.0f * base_scale;
+
+            hud.draw_text(shader, ortho, milestone_x, milestone_y,
+                          char_w * 1.05f, char_h * 1.05f,
+                          dodge_msg, 1.0f, 0.85f, 0.15f, milestone_alpha);
         }
 
         // Center state overlays
