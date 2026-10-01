@@ -187,7 +187,9 @@ public:
         distance_traveled_ = 0.0f;
         score_ = 0;
         bonus_score_ = 0;
-        last_bonus_display_timer_ = 0.0f;
+        dodge_count_ = 0;
+        dodge_milestone_ = 0;
+        dodge_milestone_timer_ = 0.0f;
         has_new_best_ = false;
         red_pattern_index_ = 0;
 
@@ -224,8 +226,13 @@ public:
 
             if (segment.has_obstacle && !segment.cleared && segment.z_position < -PlayerBall::RADIUS) {
                 segment.cleared = true;
+                ++dodge_count_;
                 bonus_score_ += 100;
-                last_bonus_display_timer_ = 1.2f;
+
+                if (dodge_count_ % 50 == 0) {
+                    dodge_milestone_ = dodge_count_;
+                    dodge_milestone_timer_ = 1.0f;
+                }
             }
 
             segment.hover_y = 0.0f;
@@ -270,8 +277,8 @@ public:
             has_new_best_ = true;
         }
 
-        if (last_bonus_display_timer_ > 0.0f) {
-            last_bonus_display_timer_ -= dt;
+        if (dodge_milestone_timer_ > 0.0f) {
+            dodge_milestone_timer_ = std::max(0.0f, dodge_milestone_timer_ - dt);
         }
 
         for (auto& segment : segments_) {
@@ -294,7 +301,9 @@ public:
     [[nodiscard]] int   get_score() const { return score_; }
     [[nodiscard]] int   get_best_score() const { return best_score_; }
     [[nodiscard]] bool  has_new_best() const { return has_new_best_; }
-    [[nodiscard]] float get_bonus_timer() const { return last_bonus_display_timer_; }
+    [[nodiscard]] int   get_dodge_count() const { return dodge_count_; }
+    [[nodiscard]] int   get_dodge_milestone() const { return dodge_milestone_; }
+    [[nodiscard]] float get_dodge_milestone_timer() const { return dodge_milestone_timer_; }
 
     void set_best_score(int b) { best_score_ = b; }
 
@@ -392,7 +401,9 @@ private:
     int   score_{0};
     int   bonus_score_{0};
     int   best_score_{0};
-    float last_bonus_display_timer_{0.0f};
+    int   dodge_count_{0};
+    int   dodge_milestone_{0};
+    float dodge_milestone_timer_{0.0f};
     bool  has_new_best_{false};
 
     std::mt19937 rng_;
