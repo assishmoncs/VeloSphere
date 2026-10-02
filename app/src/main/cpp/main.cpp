@@ -493,6 +493,26 @@ public:
 
             float px = (static_cast<float>(view_width) - 17.0f * char_w * 0.95f * 1.12f) * 0.5f;
             hud.draw_text(shader, ortho, px, by + 95.0f * base_scale, char_w * 0.95f, char_h * 0.95f, "TAP SCREEN TO RUN", 1.0f, 0.85f, 0.2f, 1.0f);
+        } else if (state == GameState::PAUSED) {
+            float box_w = 340.0f * base_scale;
+            float box_h = 155.0f * base_scale;
+            float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+            float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+
+            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.01f, 0.03f, 0.08f, 0.90f);
+            hud.draw_box(shader, ortho, bx, by, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
+            hud.draw_box(shader, ortho, bx, by + box_h - 2.0f * base_scale, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
+
+            float pause_w = char_w * 1.35f;
+            float pause_h = char_h * 1.35f;
+            float px = (static_cast<float>(view_width) - 11.0f * pause_w * 1.12f) * 0.5f;
+            hud.draw_text(shader, ortho, px, by + 24.0f * base_scale,
+                          pause_w, pause_h, "GAME PAUSED", 0.0f, 0.95f, 1.0f, 1.0f);
+
+            float rx = (static_cast<float>(view_width) - 15.0f * char_w * 0.95f * 1.12f) * 0.5f;
+            hud.draw_text(shader, ortho, rx, by + 82.0f * base_scale,
+                          char_w * 0.95f, char_h * 0.95f,
+                          "TAP TO RESUME", 1.0f, 0.85f, 0.2f, 1.0f);
         } else if (state == GameState::GAME_OVER) {
             float box_w = 340.0f * base_scale;
             float box_h = 185.0f * base_scale;
@@ -677,6 +697,10 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
 
         case APP_CMD_LOST_FOCUS:
             LOGI("Lifecycle: APP_CMD_LOST_FOCUS");
+            if (state->game_state == GameState::PLAYING) {
+                state->game_state = GameState::PAUSED;
+                LOGI("VeloSphere: Game paused (lost focus).");
+            }
             state->animating = false;
             break;
 
@@ -688,6 +712,10 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
 
         case APP_CMD_PAUSE:
             LOGI("Lifecycle: APP_CMD_PAUSE");
+            if (state->game_state == GameState::PLAYING) {
+                state->game_state = GameState::PAUSED;
+                LOGI("VeloSphere: Game paused (activity paused).");
+            }
             state->animating = false;
             save_high_score(state->app, state->high_score);
             break;
@@ -725,6 +753,10 @@ static void process_input_events(AppState* state) {
                 if (state->game_state == GameState::READY) {
                     state->game_state = GameState::PLAYING;
                     LOGI("VeloSphere: Game Started!");
+                } else if (state->game_state == GameState::PAUSED) {
+                    state->game_state = GameState::PLAYING;
+                    state->timer.reset();
+                    LOGI("VeloSphere: Game Resumed!");
                 } else if (state->game_state == GameState::GAME_OVER) {
                     // Tap to restart
                     state->treadmill.reset();
@@ -830,6 +862,8 @@ void android_main(struct android_app* app) {
             } else if (state.game_state == GameState::READY) {
                 // Slow idle drift while waiting for start
                 state.player.update(dt, 4.0f);
+            } else if (state.game_state == GameState::PAUSED) {
+                // Gameplay is intentionally frozen while paused.
             } else if (state.game_state == GameState::GAME_OVER) {
                 state.player.update(dt, 0.0f);
                 if (state.death_shake_timer > 0.0f) {
@@ -846,6 +880,7 @@ void android_main(struct android_app* app) {
                 state.log_throttle = 0.0f;
                 const char* state_str =
                     (state.game_state == GameState::PLAYING) ? "PLAYING" :
+                    (state.game_state == GameState::PAUSED)  ? "PAUSED (Tap to resume)" :
                     (state.game_state == GameState::READY)   ? "READY (Tap to start)" : "GAME OVER (Tap to retry)";
 
                 LOGI("[VeloSphere] State: %s | Score: %d | Best: %d | Speed: %.1f u/s | Ball X: %.2f",
