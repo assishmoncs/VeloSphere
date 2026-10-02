@@ -583,6 +583,36 @@ static int load_saved_high_score(struct android_app* app) {
     return hs;
 }
 
+static void play_hit_sound(struct android_app* app) {
+    if (!app || !app->activity || !app->activity->vm) {
+        return;
+    }
+
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            return;
+        }
+        attached = true;
+    }
+
+    jclass activity_class = env->GetObjectClass(app->activity->clazz);
+    if (activity_class) {
+        jmethodID play_method = env->GetStaticMethodID(activity_class, "playHitSound", "()V");
+        if (play_method) {
+            env->CallStaticVoidMethod(activity_class, play_method);
+        }
+        env->DeleteLocalRef(activity_class);
+    }
+
+    if (attached) {
+        vm->DetachCurrentThread();
+    }
+}
+
 static void save_high_score(struct android_app* app, int score) {
     std::string path = get_save_file_path(app);
     if (path.empty()) return;
@@ -768,6 +798,7 @@ void android_main(struct android_app* app) {
 
                 // 3. Collision detection: Player Sphere vs Hazard Obstacles
                 if (CollisionSystem::check_collision(state.player, state.treadmill)) {
+                    play_hit_sound(state.app);
                     state.game_state = GameState::GAME_OVER;
                     state.death_shake_timer = 0.65f;
 
