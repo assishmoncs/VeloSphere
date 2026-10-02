@@ -11,6 +11,7 @@ namespace velo {
 enum class GameState {
     READY,
     PLAYING,
+    PAUSED,
     GAME_OVER
 };
 
