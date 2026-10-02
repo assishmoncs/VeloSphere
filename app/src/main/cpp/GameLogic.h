@@ -41,6 +41,7 @@ struct PathSegment {
     bool  is_moving{false};
     float motion_phase{0.0f};
     float motion_warning_time{0.0f};
+    int   motion_direction{1}; // +1 = toward RIGHT, -1 = toward LEFT
 
     // Kept as a rendering/collision compatibility field; obstacle vertical
     // position is intentionally fixed at ground level.
@@ -209,6 +210,7 @@ public:
             segments_[i].is_moving = false;
             segments_[i].motion_phase = 0.0f;
             segments_[i].motion_warning_time = 0.0f;
+            segments_[i].motion_direction = 1;
             segments_[i].hover_y = 0.0f;
             segments_[i].cleared = false;
 
@@ -259,19 +261,51 @@ public:
                     segment.motion_phase -= 2.0f;
                 }
 
-                // Yellow hazards sweep across the entire three-lane track:
-                // LEFT -> CENTER -> RIGHT -> CENTER -> LEFT ...
-                const float from_x = LEFT_LANE_X;
-                const float target_x = RIGHT_LANE_X;
-
-                // Ping-pong between the two outer lane endpoints:
-                // 0 -> 1 -> 0, with smooth acceleration/deceleration.
+                // Yellow hazards keep sweeping across the full track, but
+                // each one starts from a random valid lane/direction:
+                // LEFT -> RIGHT, CENTER -> LEFT/RIGHT, RIGHT -> LEFT.
                 const float cycle = segment.motion_phase;
                 const float progress = (cycle <= 1.0f) ? cycle : (2.0f - cycle);
                 const float eased_t = progress * progress * (3.0f - 2.0f * progress);
 
-                segment.obstacle_x_offset =
-                    from_x + (target_x - from_x) * eased_t;
+                const float left_x = LEFT_LANE_X;
+                const float right_x = RIGHT_LANE_X;
+                const float center_x = CENTER_LANE_X;
+
+                // motion_direction determines the initial half-cycle. Once an
+                // outer edge is reached, the normal ping-pong motion reverses.
+                if (segment.lane == TrackLane::CENTER) {
+                    if (segment.motion_direction < 0) {
+                        segment.obstacle_x_offset =
+                            center_x + (left_x - center_x) * eased_t;
+                    } else {
+                        segment.obstacle_x_offset =
+                            center_x + (right_x - center_x) * eased_t;
+                    }
+
+                    // After reaching the chosen outer lane, continue into the
+                    // opposite side so the hazard still crosses the full track.
+                    if (cycle >= 1.0f) {
+                        const float opposite_progress = cycle - 1.0f;
+                        const float opposite_t =
+                            opposite_progress * opposite_progress *
+                            (3.0f - 2.0f * opposite_progress);
+
+                        const float first_edge =
+                            (segment.motion_direction < 0) ? left_x : right_x;
+                        segment.obstacle_x_offset =
+                            first_edge + (center_x - first_edge) * opposite_t;
+                    }
+                } else {
+                    // Outer lanes always have only one valid initial direction.
+                    const float from_x =
+                        (segment.lane == TrackLane::LEFT) ? left_x : right_x;
+                    const float target_x =
+                        (segment.lane == TrackLane::LEFT) ? right_x : left_x;
+
+                    segment.obstacle_x_offset =
+                        from_x + (target_x - from_x) * eased_t;
+                }
             }
         }
 
@@ -347,6 +381,7 @@ private:
         seg.hover_y = 0.0f;
         seg.motion_phase = 0.0f;
         seg.motion_warning_time = 0.0f;
+        seg.motion_direction = 1;
         seg.obstacle_width = OBSTACLE_WIDTH;
         seg.obstacle_height = OBSTACLE_HEIGHT;
         seg.obstacle_depth = OBSTACLE_DEPTH;
@@ -402,9 +437,30 @@ private:
             global_speed_ > MOVING_DIFFICULTY_START_SPEED &&
             dist_prob_(rng_) < moving_spawn_probability) {
             seg.is_moving = true;
-            seg.lane = TrackLane::LEFT;
-            seg.motion_target_lane = TrackLane::RIGHT;
-            seg.obstacle_x_offset = LEFT_LANE_X;
+
+            // Random starting lane with only legal initial directions:
+            // LEFT -> RIGHT only, CENTER -> LEFT or RIGHT, RIGHT -> LEFT only.
+            const int start_lane = static_cast<int>(dist_prob_(rng_) * 3.0f);
+            seg.lane = static_cast<TrackLane>(std::min(2, start_lane));
+
+            if (seg.lane == TrackLane::LEFT) {
+                seg.motion_direction = 1;
+                seg.motion_target_lane = TrackLane::RIGHT;
+                seg.obstacle_x_offset = LEFT_LANE_X;
+            } else if (seg.lane == TrackLane::CENTER) {
+                seg.motion_direction = (dist_prob_(rng_) < 0.5f) ? -1 : 1;
+                seg.motion_target_lane =
+                    (seg.motion_direction < 0) ? TrackLane::LEFT : TrackLane::RIGHT;
+                seg.obstacle_x_offset = CENTER_LANE_X;
+            } else {
+                seg.motion_direction = -1;
+                seg.motion_target_lane = TrackLane::LEFT;
+                seg.obstacle_x_offset = RIGHT_LANE_X;
+            }
+
+            // A direction of LEFT starts in the first half-cycle; a direction
+            // of RIGHT starts in the second half-cycle when leaving CENTER.
+            seg.motion_phase = 0.0f;
             seg.motion_warning_time = MOVING_WARNING_TIME;
         } else {
             seg.is_moving = false;
