@@ -177,6 +177,13 @@ public:
     static constexpr float MOVING_HALF_CYCLE_TIME = 1.10f;
     static constexpr float MOVING_WARNING_TIME = 0.35f;
 
+    // Progressive difficulty: moving hazards become more frequent as speed
+    // rises, while their spacing and sweep speed remain fair.
+    static constexpr float MOVING_DIFFICULTY_START_SPEED = 28.0f;
+    static constexpr float MOVING_DIFFICULTY_END_SPEED = 55.0f;
+    static constexpr float MOVING_MIN_SPAWN_PROBABILITY = 0.42f;
+    static constexpr float MOVING_MAX_SPAWN_PROBABILITY = 0.60f;
+
     TreadmillSystem()
         : rng_(std::random_device{}()),
           dist_prob_(0.0f, 1.0f) {
@@ -382,7 +389,18 @@ private:
 
         // Only the hazards selected as moving are yellow.
         // Their movement spans the full track from left lane to right lane.
-        if (moving_space_clear && global_speed_ > 28.0f && dist_prob_(rng_) > 0.58f) {
+        const float difficulty_t = std::clamp(
+            (global_speed_ - MOVING_DIFFICULTY_START_SPEED) /
+                (MOVING_DIFFICULTY_END_SPEED - MOVING_DIFFICULTY_START_SPEED),
+            0.0f, 1.0f);
+
+        const float moving_spawn_probability =
+            MOVING_MIN_SPAWN_PROBABILITY +
+            (MOVING_MAX_SPAWN_PROBABILITY - MOVING_MIN_SPAWN_PROBABILITY) * difficulty_t;
+
+        if (moving_space_clear &&
+            global_speed_ > MOVING_DIFFICULTY_START_SPEED &&
+            dist_prob_(rng_) < moving_spawn_probability) {
             seg.is_moving = true;
             seg.lane = TrackLane::LEFT;
             seg.motion_target_lane = TrackLane::RIGHT;
