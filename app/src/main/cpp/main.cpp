@@ -584,7 +584,8 @@ static int load_saved_high_score(struct android_app* app) {
 }
 
 static void play_hit_sound(struct android_app* app) {
-    if (!app || !app->activity || !app->activity->vm) {
+    if (!app || !app->activity || !app->activity->vm ||
+        !app->activity->javaGameActivity) {
         return;
     }
 
@@ -599,12 +600,22 @@ static void play_hit_sound(struct android_app* app) {
         attached = true;
     }
 
-    jclass activity_class = env->GetObjectClass(app->activity->clazz);
+    jclass activity_class =
+        env->GetObjectClass(app->activity->javaGameActivity);
+
     if (activity_class) {
-        jmethodID play_method = env->GetStaticMethodID(activity_class, "playHitSound", "()V");
+        jmethodID play_method =
+            env->GetStaticMethodID(activity_class, "playHitSound", "()V");
+
         if (play_method) {
             env->CallStaticVoidMethod(activity_class, play_method);
         }
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+
         env->DeleteLocalRef(activity_class);
     }
 
