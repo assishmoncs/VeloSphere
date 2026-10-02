@@ -261,50 +261,42 @@ public:
                     segment.motion_phase -= 2.0f;
                 }
 
-                // Yellow hazards keep sweeping across the full track, but
-                // each one starts from a random valid lane/direction:
+                // Every yellow hazard follows a full three-lane path, but
+                // starts from a random valid lane and initial direction:
                 // LEFT -> RIGHT, CENTER -> LEFT/RIGHT, RIGHT -> LEFT.
                 const float cycle = segment.motion_phase;
-                const float progress = (cycle <= 1.0f) ? cycle : (2.0f - cycle);
-                const float eased_t = progress * progress * (3.0f - 2.0f * progress);
+                const float half_cycle = std::floor(cycle);
+                const float local_t = cycle - half_cycle;
+                const float eased_t =
+                    local_t * local_t * (3.0f - 2.0f * local_t);
 
-                const float left_x = LEFT_LANE_X;
-                const float right_x = RIGHT_LANE_X;
-                const float center_x = CENTER_LANE_X;
+                TrackLane second_lane;
+                TrackLane third_lane;
 
-                // motion_direction determines the initial half-cycle. Once an
-                // outer edge is reached, the normal ping-pong motion reverses.
-                if (segment.lane == TrackLane::CENTER) {
-                    if (segment.motion_direction < 0) {
-                        segment.obstacle_x_offset =
-                            center_x + (left_x - center_x) * eased_t;
-                    } else {
-                        segment.obstacle_x_offset =
-                            center_x + (right_x - center_x) * eased_t;
-                    }
-
-                    // After reaching the chosen outer lane, continue into the
-                    // opposite side so the hazard still crosses the full track.
-                    if (cycle >= 1.0f) {
-                        const float opposite_progress = cycle - 1.0f;
-                        const float opposite_t =
-                            opposite_progress * opposite_progress *
-                            (3.0f - 2.0f * opposite_progress);
-
-                        const float first_edge =
-                            (segment.motion_direction < 0) ? left_x : right_x;
-                        segment.obstacle_x_offset =
-                            first_edge + (center_x - first_edge) * opposite_t;
-                    }
+                if (segment.lane == TrackLane::LEFT) {
+                    second_lane = TrackLane::RIGHT;
+                    third_lane = TrackLane::LEFT;
+                } else if (segment.lane == TrackLane::RIGHT) {
+                    second_lane = TrackLane::LEFT;
+                    third_lane = TrackLane::RIGHT;
+                } else if (segment.motion_direction < 0) {
+                    second_lane = TrackLane::LEFT;
+                    third_lane = TrackLane::RIGHT;
                 } else {
-                    // Outer lanes always have only one valid initial direction.
-                    const float from_x =
-                        (segment.lane == TrackLane::LEFT) ? left_x : right_x;
-                    const float target_x =
-                        (segment.lane == TrackLane::LEFT) ? right_x : left_x;
+                    second_lane = TrackLane::RIGHT;
+                    third_lane = TrackLane::LEFT;
+                }
 
+                const float start_x = lane_x(segment.lane);
+                const float second_x = lane_x(second_lane);
+                const float third_x = lane_x(third_lane);
+
+                if (cycle < 1.0f) {
                     segment.obstacle_x_offset =
-                        from_x + (target_x - from_x) * eased_t;
+                        start_x + (second_x - start_x) * eased_t;
+                } else {
+                    segment.obstacle_x_offset =
+                        second_x + (third_x - second_x) * eased_t;
                 }
             }
         }
