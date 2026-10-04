@@ -251,7 +251,9 @@ public:
                       int view_width,
                       int view_height,
                       float death_shake_timer,
-                      int high_score) {
+                      int high_score,
+                      float countdown_timer,
+                      int countdown_value) {
         glViewport(0, 0, view_width, view_height);
 
         // Background color shifts on Game Over
@@ -956,7 +958,9 @@ void android_main(struct android_app* app) {
                 state.egl.width,
                 state.egl.height,
                 state.death_shake_timer,
-                state.high_score
+                state.high_score,
+                state.countdown_timer,
+                state.countdown_value
             );
 
             // 5. Swap front and back display buffers
