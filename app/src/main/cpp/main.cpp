@@ -473,7 +473,36 @@ public:
         }
 
         // Center state overlays
-        if (state == GameState::READY) {
+        if (state == GameState::COUNTDOWN) {
+            const float pulse = 0.92f + 0.08f *
+                std::sin((1.0f - std::max(0.0f, countdown_timer)) * 12.0f);
+
+            char countdown_text[8];
+            if (countdown_value == 0) {
+                snprintf(countdown_text, sizeof(countdown_text), "GO!");
+            } else {
+                snprintf(countdown_text, sizeof(countdown_text), "%d", countdown_value);
+            }
+
+            float count_w = char_w * 2.8f;
+            float count_h = char_h * 2.8f;
+            float count_x =
+                (static_cast<float>(view_width) - count_w *
+                 static_cast<float>(strlen(countdown_text)) * 0.72f) * 0.5f;
+            float count_y = static_cast<float>(view_height) * 0.36f;
+
+            hud.draw_box(shader, ortho,
+                         0.0f, 0.0f,
+                         static_cast<float>(view_width),
+                         static_cast<float>(view_height),
+                         0.005f, 0.01f, 0.025f, 0.28f);
+
+            hud.draw_text(shader, ortho,
+                          count_x, count_y,
+                          count_w, count_h,
+                          countdown_text,
+                          0.0f, 0.95f, 1.0f, pulse);
+        } else if (state == GameState::READY) {
             float box_w = 320.0f * base_scale;
             float box_h = 140.0f * base_scale;
             float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
@@ -567,6 +596,10 @@ struct AppState {
     GameState           game_state{GameState::READY};
     PlayerBall          player{};
     TreadmillSystem     treadmill{};
+
+    // Countdown state: 3 -> 2 -> 1 -> GO! before gameplay starts.
+    float               countdown_timer{0.0f};
+    int                 countdown_value{3};
 
     bool                animating{false};
     float               death_shake_timer{0.0f};
@@ -697,7 +730,8 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
 
         case APP_CMD_LOST_FOCUS:
             LOGI("Lifecycle: APP_CMD_LOST_FOCUS");
-            if (state->game_state == GameState::PLAYING) {
+            if (state->game_state == GameState::PLAYING ||
+                state->game_state == GameState::COUNTDOWN) {
                 state->game_state = GameState::PAUSED;
                 LOGI("VeloSphere: Game paused (lost focus).");
             }
@@ -712,7 +746,8 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
 
         case APP_CMD_PAUSE:
             LOGI("Lifecycle: APP_CMD_PAUSE");
-            if (state->game_state == GameState::PLAYING) {
+            if (state->game_state == GameState::PLAYING ||
+                state->game_state == GameState::COUNTDOWN) {
                 state->game_state = GameState::PAUSED;
                 LOGI("VeloSphere: Game paused (activity paused).");
             }
@@ -751,10 +786,15 @@ static void process_input_events(AppState* state) {
                 state->last_touch_x = x;
 
                 if (state->game_state == GameState::READY) {
-                    state->game_state = GameState::PLAYING;
-                    LOGI("VeloSphere: Game Started!");
+                    state->countdown_timer = 1.0f;
+                    state->countdown_value = 3;
+                    state->game_state = GameState::COUNTDOWN;
+                    LOGI("VeloSphere: Countdown started.");
                 } else if (state->game_state == GameState::PAUSED) {
-                    state->game_state = GameState::PLAYING;
+                    state->game_state =
+                        (state->countdown_value >= 0 && state->countdown_timer > 0.0f)
+                            ? GameState::COUNTDOWN
+                            : GameState::PLAYING;
                     state->timer.reset();
                     LOGI("VeloSphere: Game Resumed!");
                 } else if (state->game_state == GameState::GAME_OVER) {
@@ -827,7 +867,23 @@ void android_main(struct android_app* app) {
             const float dt = state.timer.tick();
 
             // State-specific gameplay logic
-            if (state.game_state == GameState::PLAYING) {
+            if (state.game_state == GameState::COUNTDOWN) {
+                // Freeze gameplay during the countdown. The last half-second
+                // shows GO!, then normal gameplay begins.
+                state.countdown_timer -= dt;
+
+                if (state.countdown_timer <= 0.0f) {
+                    if (state.countdown_value > 0) {
+                        --state.countdown_value;
+                        state.countdown_timer =
+                            (state.countdown_value == 0) ? 0.5f : 1.0f;
+                    } else {
+                        state.game_state = GameState::PLAYING;
+                        state.countdown_timer = 0.0f;
+                        LOGI("VeloSphere: GO! Game started.");
+                    }
+                }
+            } else if (state.game_state == GameState::PLAYING) {
                 // 1. Advance treadmill coordinate system and global speed
                 state.treadmill.update(dt);
 
@@ -879,9 +935,10 @@ void android_main(struct android_app* app) {
             if (state.log_throttle >= 0.5f) {
                 state.log_throttle = 0.0f;
                 const char* state_str =
-                    (state.game_state == GameState::PLAYING) ? "PLAYING" :
-                    (state.game_state == GameState::PAUSED)  ? "PAUSED (Tap to resume)" :
-                    (state.game_state == GameState::READY)   ? "READY (Tap to start)" : "GAME OVER (Tap to retry)";
+                    (state.game_state == GameState::PLAYING)   ? "PLAYING" :
+                    (state.game_state == GameState::COUNTDOWN) ? "COUNTDOWN" :
+                    (state.game_state == GameState::PAUSED)   ? "PAUSED (Tap to resume)" :
+                    (state.game_state == GameState::READY)    ? "READY (Tap to start)" : "GAME OVER (Tap to retry)";
 
                 LOGI("[VeloSphere] State: %s | Score: %d | Best: %d | Speed: %.1f u/s | Ball X: %.2f",
                      state_str,
