@@ -218,6 +218,24 @@ private:
 // GRAPHICS RENDERER (SHADERS, GEOMETRY & CAMERA PIPELINE)
 // =============================================================================
 
+static float hud_base_scale(int view_width) {
+    float base_scale = static_cast<float>(view_width) / 450.0f;
+    if (base_scale < 1.0f) base_scale = 1.0f;
+    if (base_scale > 2.5f) base_scale = 2.5f;
+    return base_scale;
+}
+
+static bool is_pause_button_pressed(float x, float y, int view_width) {
+    const float scale = hud_base_scale(view_width);
+    const float button_w = 52.0f * scale;
+    const float button_h = 42.0f * scale;
+    const float button_x = (static_cast<float>(view_width) - button_w) * 0.5f;
+    const float button_y = 6.0f * scale;
+
+    return x >= button_x && x <= button_x + button_w &&
+           y >= button_y && y <= button_y + button_h;
+}
+
 class GameRenderer {
 public:
     ShaderProgram  shader;
@@ -430,9 +448,7 @@ public:
         // ---------------------------------------------------------------------
         Mat4 ortho = Mat4::ortho(0.0f, static_cast<float>(view_width), static_cast<float>(view_height), 0.0f);
 
-        float base_scale = static_cast<float>(view_width) / 450.0f;
-        if (base_scale < 1.0f) base_scale = 1.0f;
-        if (base_scale > 2.5f) base_scale = 2.5f;
+        float base_scale = hud_base_scale(view_width);
 
         float char_w = 11.0f * base_scale;
         float char_h = 18.0f * base_scale;
@@ -441,6 +457,42 @@ public:
         // Top HUD status bar backdrop
         hud.draw_box(shader, ortho, 0.0f, 0.0f, static_cast<float>(view_width), 55.0f * base_scale, 0.02f, 0.03f, 0.08f, 0.75f);
         hud.draw_box(shader, ortho, 0.0f, 53.0f * base_scale, static_cast<float>(view_width), 2.0f * base_scale, 0.0f, 0.85f, 1.0f, 0.9f);
+
+        // Dedicated play/pause control in the top-center HUD.
+        if (state == GameState::PLAYING ||
+            state == GameState::COUNTDOWN ||
+            state == GameState::PAUSED) {
+        const float pause_button_w = 52.0f * base_scale;
+        const float pause_button_h = 42.0f * base_scale;
+        const float pause_button_x = (static_cast<float>(view_width) - pause_button_w) * 0.5f;
+        const float pause_button_y = 6.0f * base_scale;
+
+        hud.draw_box(shader, ortho,
+                     pause_button_x, pause_button_y,
+                     pause_button_w, pause_button_h,
+                     0.04f, 0.10f, 0.18f, 0.95f);
+        hud.draw_box(shader, ortho,
+                     pause_button_x, pause_button_y,
+                     pause_button_w, 2.0f * base_scale,
+                     0.0f, 0.95f, 1.0f, 1.0f);
+
+        const char* pause_icon =
+            (state == GameState::PAUSED) ? ">" : "II";
+        const float icon_char_w = char_w * 1.15f;
+        const float icon_char_h = char_h * 1.15f;
+        const float icon_text_width =
+            static_cast<float>(strlen(pause_icon)) * icon_char_w * 1.12f;
+        const float icon_x =
+            pause_button_x + (pause_button_w - icon_text_width) * 0.5f;
+        const float icon_y =
+            pause_button_y + (pause_button_h - icon_char_h) * 0.5f + 1.0f * base_scale;
+
+        hud.draw_text(shader, ortho,
+                      icon_x, icon_y,
+                      icon_char_w, icon_char_h,
+                      pause_icon,
+                      0.0f, 0.95f, 1.0f, 1.0f);
+        }
 
         char score_str[32];
         snprintf(score_str, sizeof(score_str), "SCORE %06d", treadmill.get_score());
@@ -787,7 +839,25 @@ static void process_input_events(AppState* state) {
                 state->touch_active = true;
                 state->last_touch_x = x;
 
-                if (state->game_state == GameState::READY) {
+                const bool pause_button =
+                    is_pause_button_pressed(x, y, state->egl.width);
+
+                if ((state->game_state == GameState::PLAYING ||
+                     state->game_state == GameState::COUNTDOWN) &&
+                    pause_button) {
+                    state->game_state = GameState::PAUSED;
+                    state->timer.reset();
+                    LOGI("VeloSphere: Game Paused by button.");
+                } else if (state->game_state == GameState::PAUSED &&
+                           pause_button) {
+                    state->game_state =
+                        (state->countdown_timer > 0.0f &&
+                         state->countdown_value >= 0)
+                            ? GameState::COUNTDOWN
+                            : GameState::PLAYING;
+                    state->timer.reset();
+                    LOGI("VeloSphere: Game Resumed by button.");
+                } else if (state->game_state == GameState::READY) {
                     state->countdown_timer = 1.0f;
                     state->countdown_value = 3;
                     state->game_state = GameState::COUNTDOWN;
