@@ -250,11 +250,13 @@ public:
             segment.hover_y = 0.0f;
 
             if (segment.is_moving && segment.has_obstacle) {
-                // Brief warning hold at the left edge before the sweep begins.
+                // Brief warning hold at the randomly selected spawn lane
+                // before the sweep begins.
                 if (segment.motion_warning_time > 0.0f) {
                     segment.motion_warning_time =
                         std::max(0.0f, segment.motion_warning_time - dt);
-                    segment.obstacle_x_offset = LEFT_LANE_X;
+                    // Keep the obstacle exactly where it spawned during the warning.
+                    segment.obstacle_x_offset = lane_x(segment.lane);
                     continue;
                 }
 
