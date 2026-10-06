@@ -169,10 +169,11 @@ public:
     static constexpr float CENTER_LANE_X = 0.0f;
     static constexpr float RIGHT_LANE_X = LANE_WIDTH;
 
-    // Fixed obstacle geometry. Each obstacle exactly fills one lane.
+    // Fixed obstacle geometry. Each obstacle is a true cube whose
+    // dimensions exactly match one lane width.
     static constexpr float OBSTACLE_WIDTH  = LANE_WIDTH;
-    static constexpr float OBSTACLE_HEIGHT = 1.50f;
-    static constexpr float OBSTACLE_DEPTH  = 1.00f;
+    static constexpr float OBSTACLE_HEIGHT = LANE_WIDTH;
+    static constexpr float OBSTACLE_DEPTH  = LANE_WIDTH;
 
     // One-way travel time between the two lane endpoints for a moving
     // (yellow) hazard. The motion loops continuously and uses smoothstep.
