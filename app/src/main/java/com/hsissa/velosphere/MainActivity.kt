@@ -3,7 +3,10 @@ package com.hsissa.velosphere
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.SoundPool
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -16,6 +19,7 @@ class MainActivity : GameActivity() {
     private var hitSoundPool: SoundPool? = null
     private var hitSoundId: Int = 0
     private var hitSoundLoaded = false
+    private var vibrator: Vibrator? = null
 
     companion object {
         private var instance: MainActivity? = null
@@ -28,6 +32,11 @@ class MainActivity : GameActivity() {
         fun playHitSound() {
             instance?.playHitSoundInternal()
         }
+
+        @JvmStatic
+        fun vibrate(durationMs: Int, amplitude: Int) {
+            instance?.vibrateInternal(durationMs, amplitude)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,8 +44,25 @@ class MainActivity : GameActivity() {
         super.onCreate(savedInstanceState)
         instance = this
         hideSystemUI()
+        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
         initBackgroundMusic()
         initHitSound()
+    }
+
+    private fun vibrateInternal(durationMs: Int, amplitude: Int) {
+        val v = vibrator ?: return
+        if (!v.hasVibrator()) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val safeDuration = durationMs.coerceAtLeast(1).toLong()
+            val safeAmplitude = amplitude.coerceIn(1, 255)
+            v.vibrate(
+                VibrationEffect.createOneShot(safeDuration, safeAmplitude)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            v.vibrate(durationMs.coerceAtLeast(1).toLong())
+        }
     }
 
     private fun initHitSound() {
@@ -106,6 +132,7 @@ class MainActivity : GameActivity() {
         hitSoundPool = null
         hitSoundId = 0
         hitSoundLoaded = false
+        vibrator = null
         instance = null
     }
 
