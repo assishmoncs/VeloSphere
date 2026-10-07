@@ -731,6 +731,48 @@ static void play_hit_sound(struct android_app* app) {
     }
 }
 
+static void trigger_haptic(struct android_app* app, int duration_ms, int amplitude) {
+    if (!app || !app->activity || !app->activity->vm ||
+        !app->activity->javaGameActivity) {
+        return;
+    }
+
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            return;
+        }
+        attached = true;
+    }
+
+    jclass activity_class =
+        env->GetObjectClass(app->activity->javaGameActivity);
+
+    if (activity_class) {
+        jmethodID vibrate_method =
+            env->GetStaticMethodID(activity_class, "vibrate", "(II)V");
+
+        if (vibrate_method) {
+            env->CallStaticVoidMethod(activity_class, vibrate_method,
+                                      duration_ms, amplitude);
+        }
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+
+        env->DeleteLocalRef(activity_class);
+    }
+
+    if (attached) {
+        vm->DetachCurrentThread();
+    }
+}
+
 static void save_high_score(struct android_app* app, int score) {
     std::string path = get_save_file_path(app);
     if (path.empty()) return;
@@ -957,7 +999,16 @@ void android_main(struct android_app* app) {
                 }
             } else if (state.game_state == GameState::PLAYING) {
                 // 1. Advance treadmill coordinate system and global speed
+                const float previous_dodge_milestone_timer =
+                    state.treadmill.get_dodge_milestone_timer();
                 state.treadmill.update(dt);
+
+                // Give a light haptic pulse exactly once when a new
+                // 50/100/150... dodge milestone is reached.
+                if (state.treadmill.get_dodge_milestone_timer() >
+                    previous_dodge_milestone_timer) {
+                    trigger_haptic(state.app, 60, 100);
+                }
 
                 // 2. Advance player lateral movement and rolling rotation
                 state.player.update(dt, state.treadmill.get_global_speed());
@@ -970,6 +1021,7 @@ void android_main(struct android_app* app) {
                 // 3. Collision detection: Player Sphere vs Hazard Obstacles
                 if (CollisionSystem::check_collision(state.player, state.treadmill)) {
                     play_hit_sound(state.app);
+                    trigger_haptic(state.app, 140, 230);
                     state.game_state = GameState::GAME_OVER;
                     state.death_shake_timer = 0.65f;
 
