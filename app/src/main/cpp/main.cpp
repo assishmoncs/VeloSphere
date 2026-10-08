@@ -443,6 +443,22 @@ public:
         // ---------------------------------------------------------------------
         particles.draw(shader, vp);
 
+        // Impact flash: reuse the existing death-shake timer so the
+        // collision gets a brief decaying visual hit without affecting gameplay.
+        if (state == GameState::GAME_OVER && death_shake_timer > 0.0f) {
+            const float flash_alpha =
+                0.45f * std::clamp(death_shake_timer / 0.65f, 0.0f, 1.0f);
+
+            Mat4 flash_ortho =
+                Mat4::ortho(0.0f, static_cast<float>(view_width),
+                            static_cast<float>(view_height), 0.0f);
+            hud.draw_box(shader, flash_ortho,
+                         0.0f, 0.0f,
+                         static_cast<float>(view_width),
+                         static_cast<float>(view_height),
+                         1.0f, 0.08f, 0.12f, flash_alpha);
+        }
+
         // ---------------------------------------------------------------------
         // 5. RENDER ON-SCREEN ARCADE HUD (SCORE, BEST, SPEED, OVERLAYS)
         // ---------------------------------------------------------------------
@@ -598,7 +614,7 @@ public:
                           "TAP TO RESUME", 1.0f, 0.85f, 0.2f, 1.0f);
         } else if (state == GameState::GAME_OVER) {
             float box_w = 340.0f * base_scale;
-            float box_h = 185.0f * base_scale;
+            float box_h = 190.0f * base_scale;
             float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
             float by = (static_cast<float>(view_height) - box_h) * 0.40f;
 
@@ -611,18 +627,34 @@ public:
             float gx = (static_cast<float>(view_width) - 9.0f * go_w * 1.12f) * 0.5f;
             hud.draw_text(shader, ortho, gx, by + 18.0f * base_scale, go_w, go_h, "GAME OVER", 1.0f, 0.25f, 0.35f, 1.0f);
 
+            if (treadmill.has_new_best()) {
+                float nb_w = char_w * 1.05f;
+                float nb_h = char_h * 1.05f;
+                const char* new_best_text = "NEW BEST!";
+                float nb_text_width =
+                    static_cast<float>(strlen(new_best_text)) * nb_w * 1.12f;
+                float nb_x =
+                    (static_cast<float>(view_width) - nb_text_width) * 0.5f;
+
+                hud.draw_text(shader, ortho,
+                              nb_x, by + 49.0f * base_scale,
+                              nb_w, nb_h,
+                              new_best_text,
+                              1.0f, 0.85f, 0.15f, 1.0f);
+            }
+
             char fin_str[32];
             snprintf(fin_str, sizeof(fin_str), "SCORE  %d", treadmill.get_score());
             float fx = (static_cast<float>(view_width) - static_cast<float>(strlen(fin_str)) * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, fx, by + 65.0f * base_scale, char_w, char_h, fin_str, 1.0f, 1.0f, 1.0f, 1.0f);
+            hud.draw_text(shader, ortho, fx, by + 78.0f * base_scale, char_w, char_h, fin_str, 1.0f, 1.0f, 1.0f, 1.0f);
 
             char bst_res[32];
             snprintf(bst_res, sizeof(bst_res), "BEST   %d", high_score);
             float bx_pos = (static_cast<float>(view_width) - static_cast<float>(strlen(bst_res)) * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, bx_pos, by + 95.0f * base_scale, char_w, char_h, bst_res, 1.0f, 0.85f, 0.2f, 1.0f);
+            hud.draw_text(shader, ortho, bx_pos, by + 108.0f * base_scale, char_w, char_h, bst_res, 1.0f, 0.85f, 0.2f, 1.0f);
 
             float rx = (static_cast<float>(view_width) - 12.0f * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, rx, by + 140.0f * base_scale, char_w, char_h, "TAP TO RETRY", 0.0f, 0.95f, 1.0f, 1.0f);
+            hud.draw_text(shader, ortho, rx, by + 145.0f * base_scale, char_w, char_h, "TAP TO RETRY", 0.0f, 0.95f, 1.0f, 1.0f);
         }
     }
 
