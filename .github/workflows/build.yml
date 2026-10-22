@@ -1,4 +1,4 @@
-name: Android CI Build
+name: Android & Native C++ CI Build
 
 on:
   push:
@@ -8,8 +8,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  native-unit-tests:
+    name: Run C++17 Engine Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Compile and Execute C++17 Unit Tests
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Iapp/src/main/cpp \
+            tests/GameLogicTest.cpp -o build_test_runner
+          ./build_test_runner
+
   build:
-    name: Build Debug APK
+    name: Build Android APK
+    needs: native-unit-tests
     runs-on: ubuntu-latest
 
     steps:
@@ -41,8 +56,8 @@ jobs:
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Debug & Release APKs with Gradle
+        run: ./gradlew assembleDebug assembleRelease --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4

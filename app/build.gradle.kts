@@ -6,15 +6,15 @@ plugins {
 
 android {
     namespace = "com.hsissa.velosphere"
-    compileSdk = 36
+    compileSdk = 35
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.hsissa.velosphere"
         minSdk = 24
-        targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        targetSdk = 35
+        versionCode = 3
+        versionName = "2.0.0"
 
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -42,8 +42,24 @@ android {
     }
 
     buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    cppFlags.addAll(listOf("-O0", "-g"))
+                }
+            }
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
+            externalNativeBuild {
+                cmake {
+                    cppFlags.addAll(listOf("-O3", "-DNDEBUG"))
+                }
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

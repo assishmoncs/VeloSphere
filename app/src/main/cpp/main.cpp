@@ -1,5 +1,5 @@
 /**
- * VeloSphere - Native 3D Endless Runner
+ * VeloSphere - Native 3D Endless Runner (Production Release 2.0)
  * Complete Game Engine Implementation (OpenGL ES 3.0, GameActivity, C++17)
  */
 
@@ -7,10 +7,6 @@
 #include <game-activity/GameActivity.h>
 #include <game-activity/native_app_glue/android_native_app_glue.h>
 
-// android_native_app_glue is compiled into game-activity_static library
-
-
-// Register GameActivity native methods
 extern "C" {
     void GameActivity_register(JNIEnv* env);
 }
@@ -41,7 +37,6 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 #include "Mesh.h"
 #include "GameLogic.h"
 
-// Cleanly undefine glue logging macros to eliminate compiler warnings
 #ifdef LOG_TAG
 #undef LOG_TAG
 #endif
@@ -206,7 +201,7 @@ public:
         last_time_ = now;
 
         float dt = elapsed.count();
-        if (dt > 0.1f) dt = 0.1f; // Clamp to avoid physics explosion
+        if (dt > 0.1f) dt = 0.1f;
         return dt;
     }
 
@@ -215,7 +210,7 @@ private:
 };
 
 // =============================================================================
-// GRAPHICS RENDERER (SHADERS, GEOMETRY & CAMERA PIPELINE)
+// UI LAYOUT & HIT-TEST HELPERS
 // =============================================================================
 
 static float hud_base_scale(int view_width) {
@@ -225,21 +220,87 @@ static float hud_base_scale(int view_width) {
     return base_scale;
 }
 
-static bool is_pause_button_pressed(float x, float y, int view_width) {
-    const float scale = hud_base_scale(view_width);
-    const float button_w = 52.0f * scale;
-    const float button_h = 42.0f * scale;
-    const float button_x = (static_cast<float>(view_width) - button_w) * 0.5f;
-    const float button_y = 6.0f * scale;
+struct Rect2D {
+    float x{0.0f};
+    float y{0.0f};
+    float w{0.0f};
+    float h{0.0f};
 
-    return x >= button_x && x <= button_x + button_w &&
-           y >= button_y && y <= button_y + button_h;
+    bool contains(float px, float py) const {
+        return px >= x && px <= (x + w) && py >= y && py <= (y + h);
+    }
+};
+
+static Rect2D get_pause_button_rect(int view_width) {
+    const float scale = hud_base_scale(view_width);
+    const float w = 52.0f * scale;
+    const float h = 42.0f * scale;
+    return {(static_cast<float>(view_width) - w) * 0.5f, 6.0f * scale, w, h};
 }
+
+static Rect2D get_ready_mode_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 360.0f * scale;
+    const float box_h = 260.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.42f;
+    return {bx + 20.0f * scale, by + 92.0f * scale, box_w - 40.0f * scale, 34.0f * scale};
+}
+
+static Rect2D get_ready_skin_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 360.0f * scale;
+    const float box_h = 260.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.42f;
+    return {bx + 20.0f * scale, by + 134.0f * scale, box_w - 40.0f * scale, 34.0f * scale};
+}
+
+static Rect2D get_ready_audio_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 360.0f * scale;
+    const float box_h = 260.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.42f;
+    return {bx + 20.0f * scale, by + 176.0f * scale, box_w - 40.0f * scale, 32.0f * scale};
+}
+
+static Rect2D get_pause_restart_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 340.0f * scale;
+    const float box_h = 210.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+    return {bx + 30.0f * scale, by + 112.0f * scale, box_w - 60.0f * scale, 34.0f * scale};
+}
+
+static Rect2D get_pause_menu_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 340.0f * scale;
+    const float box_h = 210.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+    return {bx + 30.0f * scale, by + 156.0f * scale, box_w - 60.0f * scale, 34.0f * scale};
+}
+
+static Rect2D get_gameover_menu_button_rect(int view_width, int view_height) {
+    const float scale = hud_base_scale(view_width);
+    const float box_w = 350.0f * scale;
+    const float box_h = 250.0f * scale;
+    const float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
+    const float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+    return {bx + 35.0f * scale, by + 202.0f * scale, box_w - 70.0f * scale, 34.0f * scale};
+}
+
+// =============================================================================
+// GRAPHICS RENDERER (SHADERS, GEOMETRY & CAMERA PIPELINE)
+// =============================================================================
 
 class GameRenderer {
 public:
     ShaderProgram  shader;
     SphereMesh     sphere_mesh;
+    SphereMesh     orb_mesh;
     BoxMesh        box_mesh;
     BoxMesh        rail_mesh;
     TrackMesh      track_mesh;
@@ -252,7 +313,8 @@ public:
             return false;
         }
 
-        sphere_mesh.init(PlayerBall::RADIUS, 24, 16);
+        sphere_mesh.init(PlayerBall::RADIUS, 28, 18);
+        orb_mesh.init(0.32f, 16, 12);
         box_mesh.init(1.0f, 1.0f, 1.0f);
         rail_mesh.init(0.25f, 0.40f, TreadmillSystem::SEGMENT_SPACING);
         track_mesh.init(PlayerBall::TRACK_HALF_WIDTH * 2.0f, TreadmillSystem::SEGMENT_SPACING);
@@ -265,33 +327,35 @@ public:
 
     void render_frame(const PlayerBall& player,
                       const TreadmillSystem& treadmill,
+                      const SaveData& save,
                       GameState state,
                       int view_width,
                       int view_height,
                       float death_shake_timer,
-                      int high_score,
                       float countdown_timer,
                       int countdown_value) {
         glViewport(0, 0, view_width, view_height);
 
-        // Background color shifts on Game Over
+        const auto& biome = BIOME_PALETTES[treadmill.get_biome_index()];
+
         if (state == GameState::GAME_OVER) {
             glClearColor(0.12f, 0.02f, 0.04f, 1.0f);
+            shader.use();
+            shader.set_sky_color(0.12f, 0.02f, 0.04f);
         } else {
-            glClearColor(0.02f, 0.03f, 0.06f, 1.0f);
+            glClearColor(biome.sky_fog.r, biome.sky_fog.g, biome.sky_fog.b, 1.0f);
+            shader.use();
+            shader.set_sky_color(biome.sky_fog.r, biome.sky_fog.g, biome.sky_fog.b);
         }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.use();
-
-        // Camera calculations: dynamic speed warp FOV (widens with speed)
         float aspect = (view_height > 0) ? (static_cast<float>(view_width) / static_cast<float>(view_height)) : 1.0f;
         float speed = treadmill.get_global_speed();
         float speed_frac = (speed - TreadmillSystem::BASE_SPEED) / (TreadmillSystem::MAX_SPEED - TreadmillSystem::BASE_SPEED);
-        float fov = 60.0f + std::clamp(speed_frac, 0.0f, 1.0f) * 10.0f;
+        float extra_fov = (treadmill.get_active_powerup() == PowerUpType::OVERDRIVE) ? 6.0f : 0.0f;
+        float fov = 60.0f + std::clamp(speed_frac, 0.0f, 1.2f) * 10.0f + extra_fov;
         Mat4 projection = Mat4::perspective(to_radians(fov), aspect, 0.1f, 150.0f);
 
-        // Dynamic camera tracking with smooth lag and impact shake
         float shake_offset_x = 0.0f;
         float shake_offset_y = 0.0f;
         if (death_shake_timer > 0.0f) {
@@ -301,12 +365,12 @@ public:
 
         Vec3 eye = {
             player.pos.x * 0.30f + shake_offset_x,
-            3.8f + shake_offset_y,
+            3.8f + player.jump_y * 0.25f + shake_offset_y,
             -5.5f
         };
         Vec3 target = {
             player.pos.x * 0.18f,
-            1.2f,
+            1.2f + player.jump_y * 0.15f,
             18.0f
         };
         Vec3 up = {0.0f, 1.0f, 0.0f};
@@ -318,48 +382,45 @@ public:
         shader.set_view_pos(eye);
 
         // ---------------------------------------------------------------------
-        // 1. RENDER TRACK RUNWAY & RAILS (NEON SYNTHWAVE)
+        // 1. RENDER TRACK RUNWAY, RAILS, OBSTACLES, ORBS & POWER-UPS
         // ---------------------------------------------------------------------
         const auto& segments = treadmill.get_segments();
+        const float spin = treadmill.get_orb_spin_angle();
+
         for (const auto& seg : segments) {
-            // Track runway floor
             Mat4 model_floor = Mat4::translate(0.0f, 0.0f, seg.z_position);
             shader.set_model(model_floor);
             shader.set_mvp(vp * model_floor);
-            shader.set_shading_mode(1); // Neon grid mode
-            shader.set_color(0.0f, 0.85f, 1.0f, 1.0f);
+            shader.set_shading_mode(1);
+            shader.set_color(biome.floor_base.r, biome.floor_base.g, biome.floor_base.b, 1.0f);
+            shader.set_energy_color(biome.grid_color.r, biome.grid_color.g, biome.grid_color.b);
             shader.set_emission(0.5f);
             track_mesh.draw();
 
-            // Left glowing side rail
+            shader.set_shading_mode(0);
+            shader.set_color(biome.rail_color.r, biome.rail_color.g, biome.rail_color.b, 1.0f);
+            shader.set_emission(0.85f);
+
             Mat4 model_left_rail = Mat4::translate(-PlayerBall::TRACK_HALF_WIDTH, 0.20f, seg.z_position);
             shader.set_model(model_left_rail);
             shader.set_mvp(vp * model_left_rail);
-            shader.set_shading_mode(0); // Lit mode
-            shader.set_color(0.0f, 0.9f, 1.0f, 1.0f);
-            shader.set_emission(0.85f);
             rail_mesh.draw();
 
-            // Right glowing side rail
             Mat4 model_right_rail = Mat4::translate(PlayerBall::TRACK_HALF_WIDTH, 0.20f, seg.z_position);
             shader.set_model(model_right_rail);
             shader.set_mvp(vp * model_right_rail);
-            shader.set_color(0.0f, 0.9f, 1.0f, 1.0f);
-            shader.set_emission(0.85f);
             rail_mesh.draw();
 
-            // Two ground dividers make the three playable lanes visually explicit.
             const float lane_divider_x = TreadmillSystem::LANE_WIDTH * 0.5f;
             const float lane_divider_y = 0.018f;
+            shader.set_color(biome.grid_color.r * 0.45f, biome.grid_color.g * 0.45f, biome.grid_color.b * 0.55f, 1.0f);
+            shader.set_emission(0.32f);
 
             Mat4 model_left_divider =
                 Mat4::translate(-lane_divider_x, lane_divider_y, seg.z_position) *
                 Mat4::scale(0.045f, 0.025f, TreadmillSystem::SEGMENT_SPACING * 0.90f);
             shader.set_model(model_left_divider);
             shader.set_mvp(vp * model_left_divider);
-            shader.set_shading_mode(0);
-            shader.set_color(0.02f, 0.40f, 0.55f, 1.0f);
-            shader.set_emission(0.30f);
             box_mesh.draw();
 
             Mat4 model_right_divider =
@@ -367,49 +428,112 @@ public:
                 Mat4::scale(0.045f, 0.025f, TreadmillSystem::SEGMENT_SPACING * 0.90f);
             shader.set_model(model_right_divider);
             shader.set_mvp(vp * model_right_divider);
-            shader.set_color(0.02f, 0.40f, 0.55f, 1.0f);
-            shader.set_emission(0.30f);
             box_mesh.draw();
 
-            // -----------------------------------------------------------------
-            // 2. RENDER SINGLE-LANE OBSTACLES
-            // -----------------------------------------------------------------
+            // Render Collectible Data Orb
+            if (seg.has_orb && !seg.orb_collected) {
+                float bob = std::sin(spin * 2.0f + seg.z_position * 0.2f) * 0.12f;
+                Mat4 model_orb =
+                    Mat4::translate(seg.orb_pos.x, seg.orb_pos.y + bob, seg.orb_pos.z) *
+                    Mat4::rotate_y(spin);
+                shader.set_model(model_orb);
+                shader.set_mvp(vp * model_orb);
+                shader.set_shading_mode(2);
+                shader.set_color(1.0f, 0.88f, 0.12f, 1.0f);
+                shader.set_emission(1.15f);
+                orb_mesh.draw();
+            }
+
+            // Render Collectible Power-Up Cube
+            if (seg.powerup_type != PowerUpType::NONE && !seg.powerup_collected) {
+                float bob = std::cos(spin * 2.2f + seg.z_position * 0.3f) * 0.15f;
+                Mat4 model_pu =
+                    Mat4::translate(seg.powerup_pos.x, seg.powerup_pos.y + bob, seg.powerup_pos.z) *
+                    Mat4::rotate_y(spin * 1.5f) *
+                    Mat4::rotate_x(spin * 0.8f) *
+                    Mat4::scale(0.62f, 0.62f, 0.62f);
+                shader.set_model(model_pu);
+                shader.set_mvp(vp * model_pu);
+                shader.set_shading_mode(2);
+
+                switch (seg.powerup_type) {
+                    case PowerUpType::SHIELD:
+                        shader.set_color(0.05f, 0.95f, 1.0f, 1.0f);
+                        break;
+                    case PowerUpType::OVERDRIVE:
+                        shader.set_color(1.0f, 0.20f, 0.85f, 1.0f);
+                        break;
+                    case PowerUpType::SLOW_MO:
+                        shader.set_color(0.55f, 0.30f, 1.0f, 1.0f);
+                        break;
+                    case PowerUpType::MAGNET:
+                    default:
+                        shader.set_color(0.15f, 1.0f, 0.45f, 1.0f);
+                        break;
+                }
+                shader.set_emission(1.25f);
+                box_mesh.draw();
+            }
+
+            // Render Obstacle by Type
             if (seg.has_obstacle) {
-                // obstacle_x_offset is always a legal three-lane position.
                 Mat4 model_box =
-                    Mat4::translate(seg.obstacle_x_offset, seg.obstacle_height * 0.5f, seg.z_position) *
+                    Mat4::translate(seg.obstacle_x_offset, seg.hover_y + seg.obstacle_height * 0.5f, seg.z_position) *
                     Mat4::scale(seg.obstacle_width, seg.obstacle_height, seg.obstacle_depth);
 
                 shader.set_model(model_box);
                 shader.set_mvp(vp * model_box);
-                shader.set_shading_mode(2); // Glowing hazard mode
+                shader.set_shading_mode(2);
 
                 if (seg.is_moving) {
-                    // Moving hazards: amber. While the warning hold is active,
-                    // pulse the emission so the upcoming sweep is readable.
                     if (seg.motion_warning_time > 0.0f) {
                         const float warning_progress =
                             1.0f - (seg.motion_warning_time / TreadmillSystem::MOVING_WARNING_TIME);
                         const float pulse =
                             0.75f + 0.25f * std::sin(warning_progress * 18.0f);
-
                         shader.set_color(1.0f, 0.80f, 0.08f, 1.0f);
                         shader.set_emission(1.0f + 0.70f * pulse);
                     } else {
                         shader.set_color(1.0f, 0.65f, 0.0f, 1.0f);
                         shader.set_emission(0.90f);
                     }
+                    box_mesh.draw();
+                } else if (seg.obstacle_type == ObstacleType::LOW_BARRIER) {
+                    // Jumpable low laser hurdle in vivid violet-magenta
+                    shader.set_color(0.85f, 0.15f, 1.0f, 1.0f);
+                    shader.set_emission(0.95f);
+                    box_mesh.draw();
+                } else if (seg.obstacle_type == ObstacleType::OVERHEAD_GATE) {
+                    // Elevated gate with two thin side pillars so player knows to roll under
+                    shader.set_color(1.0f, 0.28f, 0.15f, 1.0f);
+                    shader.set_emission(0.85f);
+                    box_mesh.draw();
+
+                    float pillar_h = seg.hover_y;
+                    float pillar_x_off = seg.obstacle_width * 0.44f;
+                    Mat4 left_pillar =
+                        Mat4::translate(seg.obstacle_x_offset - pillar_x_off, pillar_h * 0.5f, seg.z_position) *
+                        Mat4::scale(0.16f, pillar_h, seg.obstacle_depth * 0.5f);
+                    shader.set_model(left_pillar);
+                    shader.set_mvp(vp * left_pillar);
+                    box_mesh.draw();
+
+                    Mat4 right_pillar =
+                        Mat4::translate(seg.obstacle_x_offset + pillar_x_off, pillar_h * 0.5f, seg.z_position) *
+                        Mat4::scale(0.16f, pillar_h, seg.obstacle_depth * 0.5f);
+                    shader.set_model(right_pillar);
+                    shader.set_mvp(vp * right_pillar);
+                    box_mesh.draw();
                 } else {
-                    // Stationary hazards: glowing neon ruby
                     shader.set_color(1.0f, 0.12f, 0.38f, 1.0f);
                     shader.set_emission(0.75f);
+                    box_mesh.draw();
                 }
-                box_mesh.draw();
             }
         }
 
         // ---------------------------------------------------------------------
-        // 3. RENDER PLAYER BALL (SPHERE WITH 3D ROLLING BANDS & TUMBLING)
+        // 2. RENDER PLAYER SPHERE & ACTIVE SHIELD / OVERDRIVE SHELL
         // ---------------------------------------------------------------------
         Mat4 model_ball;
         if (player.is_tumbling) {
@@ -425,26 +549,60 @@ public:
                 Mat4::rotate_x(player.roll_angle);
         }
 
+        int skin_idx = std::clamp(save.selected_skin, 0, static_cast<int>(SKIN_PALETTES.size()) - 1);
+        const auto& skin = SKIN_PALETTES[static_cast<size_t>(skin_idx)];
+
         shader.set_model(model_ball);
         shader.set_mvp(vp * model_ball);
-        shader.set_shading_mode(3); // High-tech player sphere with visible rolling bands!
+        shader.set_shading_mode(3);
+        shader.set_energy_color(skin.energy_color.r, skin.energy_color.g, skin.energy_color.b);
 
         if (state == GameState::GAME_OVER) {
             shader.set_color(1.0f, 0.25f, 0.25f, 1.0f);
             shader.set_emission(0.95f);
+        } else if (treadmill.get_active_powerup() == PowerUpType::OVERDRIVE) {
+            shader.set_color(1.0f, 0.92f, 0.35f, 1.0f);
+            shader.set_emission(0.85f);
         } else {
-            shader.set_color(0.12f, 0.95f, 0.88f, 1.0f);
+            shader.set_color(skin.core_color.r, skin.core_color.g, skin.core_color.b, 1.0f);
             shader.set_emission(0.35f);
         }
         sphere_mesh.draw();
 
+        // Render Holographic Shield Shell if Shield or Invulnerability or Overdrive is active
+        if (!player.is_tumbling &&
+            (treadmill.is_shield_active() ||
+             player.invulnerable_timer > 0.0f ||
+             treadmill.get_active_powerup() == PowerUpType::OVERDRIVE)) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            glDepthMask(GL_FALSE);
+
+            Mat4 model_shield =
+                Mat4::translate(player.pos.x, player.pos.y, player.pos.z) *
+                Mat4::rotate_y(spin * 1.4f) *
+                Mat4::scale(1.28f, 1.28f, 1.28f);
+            shader.set_model(model_shield);
+            shader.set_mvp(vp * model_shield);
+            shader.set_shading_mode(7);
+
+            if (treadmill.get_active_powerup() == PowerUpType::OVERDRIVE) {
+                shader.set_color(1.0f, 0.25f, 0.85f, 0.85f);
+            } else {
+                shader.set_color(0.05f, 0.95f, 1.0f, 0.80f);
+            }
+            shader.set_emission(1.4f);
+            sphere_mesh.draw();
+
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
+        }
+
         // ---------------------------------------------------------------------
-        // 4. RENDER SPARK PARTICLES
+        // 3. RENDER SPARK PARTICLES
         // ---------------------------------------------------------------------
         particles.draw(shader, vp);
 
-        // Impact flash: reuse the existing death-shake timer so the
-        // collision gets a brief decaying visual hit without affecting gameplay.
         if (state == GameState::GAME_OVER && death_shake_timer > 0.0f) {
             const float flash_alpha =
                 0.45f * std::clamp(death_shake_timer / 0.65f, 0.0f, 1.0f);
@@ -460,201 +618,235 @@ public:
         }
 
         // ---------------------------------------------------------------------
-        // 5. RENDER ON-SCREEN ARCADE HUD (SCORE, BEST, SPEED, OVERLAYS)
+        // 4. RENDER ON-SCREEN ARCADE HUD & INTERACTIVE MENUS
         // ---------------------------------------------------------------------
-        Mat4 ortho = Mat4::ortho(0.0f, static_cast<float>(view_width), static_cast<float>(view_height), 0.0f);
+        const float vw = static_cast<float>(view_width);
+        const float vh = static_cast<float>(view_height);
+        Mat4 ortho = Mat4::ortho(0.0f, vw, vh, 0.0f);
 
         float base_scale = hud_base_scale(view_width);
-
-        float char_w = 11.0f * base_scale;
-        float char_h = 18.0f * base_scale;
-        float pad = 16.0f * base_scale;
+        float char_w = 10.5f * base_scale;
+        float char_h = 17.0f * base_scale;
+        float pad = 14.0f * base_scale;
 
         // Top HUD status bar backdrop
-        hud.draw_box(shader, ortho, 0.0f, 0.0f, static_cast<float>(view_width), 55.0f * base_scale, 0.02f, 0.03f, 0.08f, 0.75f);
-        hud.draw_box(shader, ortho, 0.0f, 53.0f * base_scale, static_cast<float>(view_width), 2.0f * base_scale, 0.0f, 0.85f, 1.0f, 0.9f);
+        hud.draw_box(shader, ortho, 0.0f, 0.0f, vw, 58.0f * base_scale, 0.02f, 0.03f, 0.08f, 0.82f);
+        hud.draw_box(shader, ortho, 0.0f, 56.0f * base_scale, vw, 2.0f * base_scale, 0.0f, 0.85f, 1.0f, 0.9f);
 
-        // Dedicated play/pause control in the top-center HUD.
+        // Top-Center Pause Button
         if (state == GameState::PLAYING ||
             state == GameState::COUNTDOWN ||
             state == GameState::PAUSED) {
-        const float pause_button_w = 52.0f * base_scale;
-        const float pause_button_h = 42.0f * base_scale;
-        const float pause_button_x = (static_cast<float>(view_width) - pause_button_w) * 0.5f;
-        const float pause_button_y = 6.0f * base_scale;
+            Rect2D pb = get_pause_button_rect(view_width);
+            hud.draw_box(shader, ortho, pb.x, pb.y, pb.w, pb.h, 0.04f, 0.10f, 0.18f, 0.95f);
+            hud.draw_box(shader, ortho, pb.x, pb.y, pb.w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
 
-        hud.draw_box(shader, ortho,
-                     pause_button_x, pause_button_y,
-                     pause_button_w, pause_button_h,
-                     0.04f, 0.10f, 0.18f, 0.95f);
-        hud.draw_box(shader, ortho,
-                     pause_button_x, pause_button_y,
-                     pause_button_w, 2.0f * base_scale,
-                     0.0f, 0.95f, 1.0f, 1.0f);
-
-        const char* pause_icon =
-            (state == GameState::PAUSED) ? ">" : "II";
-        const float icon_char_w = char_w * 1.15f;
-        const float icon_char_h = char_h * 1.15f;
-        const float icon_text_width =
-            static_cast<float>(strlen(pause_icon)) * icon_char_w * 1.12f;
-        const float icon_x =
-            pause_button_x + (pause_button_w - icon_text_width) * 0.5f;
-        const float icon_y =
-            pause_button_y + (pause_button_h - icon_char_h) * 0.5f + 1.0f * base_scale;
-
-        hud.draw_text(shader, ortho,
-                      icon_x, icon_y,
-                      icon_char_w, icon_char_h,
-                      pause_icon,
-                      0.0f, 0.95f, 1.0f, 1.0f);
+            const char* pause_icon = (state == GameState::PAUSED) ? ">" : "II";
+            hud.draw_text_centered(shader, ortho,
+                                   pb.x + pb.w * 0.5f,
+                                   pb.y + (pb.h - char_h * 1.1f) * 0.5f,
+                                   char_w * 1.1f, char_h * 1.1f,
+                                   pause_icon, 0.0f, 0.95f, 1.0f, 1.0f);
         }
 
+        // Top-Left: Score & Combo
         char score_str[32];
-        snprintf(score_str, sizeof(score_str), "SCORE %06d", treadmill.get_score());
-        hud.draw_text(shader, ortho, pad, pad, char_w, char_h, score_str, 0.0f, 0.95f, 1.0f, 1.0f);
+        std::snprintf(score_str, sizeof(score_str), "SCORE %06d", treadmill.get_score());
+        hud.draw_text(shader, ortho, pad, 10.0f * base_scale, char_w, char_h, score_str, 0.0f, 0.95f, 1.0f, 1.0f);
 
+        char sub_left[32];
+        if (treadmill.get_game_mode() == GameMode::TIME_ATTACK) {
+            std::snprintf(sub_left, sizeof(sub_left), "TIME %04.1FS  X%d", treadmill.get_time_remaining(), treadmill.get_combo());
+        } else {
+            std::snprintf(sub_left, sizeof(sub_left), "COMBO X%d  ORBS %d", treadmill.get_combo(), save.total_orbs + treadmill.get_run_orbs());
+        }
+        hud.draw_text(shader, ortho, pad, 33.0f * base_scale, char_w * 0.78f, char_h * 0.78f, sub_left, 0.35f, 1.0f, 0.65f, 0.95f);
+
+        // Top-Right: Best Score & Biome Name
+        int mode_best = std::max(save.get_best_for_mode(treadmill.get_game_mode()), treadmill.get_score());
         char best_str[32];
-        snprintf(best_str, sizeof(best_str), "BEST %06d", high_score);
-        float best_x = static_cast<float>(view_width) - (11.0f * char_w * 1.12f) - pad;
-        if (best_x < pad + 12.0f * char_w * 1.12f) best_x = static_cast<float>(view_width) * 0.52f;
-        hud.draw_text(shader, ortho, best_x, pad, char_w, char_h, best_str, 1.0f, 0.85f, 0.15f, 1.0f);
+        std::snprintf(best_str, sizeof(best_str), "BEST %06d", mode_best);
+        float best_w = HudRenderer::measure_text_width(best_str, char_w);
+        hud.draw_text(shader, ortho, vw - best_w - pad, 10.0f * base_scale, char_w, char_h, best_str, 1.0f, 0.85f, 0.15f, 1.0f);
 
-        // Speedometer at bottom-left
+        float biome_w = HudRenderer::measure_text_width(biome.name, char_w * 0.75f);
+        hud.draw_text(shader, ortho, vw - biome_w - pad, 33.0f * base_scale, char_w * 0.75f, char_h * 0.75f,
+                      biome.name, biome.grid_color.r, biome.grid_color.g, biome.grid_color.b, 0.9f);
+
+        // Bottom-Left: Speedometer
         int speed_mph = static_cast<int>(treadmill.get_global_speed() * 1.6f);
         char spd_str[32];
-        snprintf(spd_str, sizeof(spd_str), "%d MPH", speed_mph);
-        hud.draw_text(shader, ortho, pad, static_cast<float>(view_height) - 40.0f * base_scale, char_w * 0.9f, char_h * 0.9f, spd_str, 0.2f, 1.0f, 0.4f, 0.9f);
+        std::snprintf(spd_str, sizeof(spd_str), "%d MPH", speed_mph);
+        hud.draw_text(shader, ortho, pad, vh - 36.0f * base_scale, char_w * 0.9f, char_h * 0.9f, spd_str, 0.2f, 1.0f, 0.4f, 0.9f);
 
-        // Dodge milestone indicator: appears once for one second at
-        // 50, 100, 150... successful obstacle dodges.
-        if (treadmill.get_dodge_milestone_timer() > 0.0f) {
-            char dodge_msg[32];
-            snprintf(dodge_msg, sizeof(dodge_msg), "%d+ DODGES", treadmill.get_dodge_milestone());
-
-            float milestone_alpha = std::min(1.0f, treadmill.get_dodge_milestone_timer());
-            float text_width = static_cast<float>(strlen(dodge_msg)) * char_w * 1.12f;
-            float milestone_x = (static_cast<float>(view_width) - text_width) * 0.5f;
-            float milestone_y = 70.0f * base_scale;
-
-            hud.draw_text(shader, ortho, milestone_x, milestone_y,
-                          char_w * 1.05f, char_h * 1.05f,
-                          dodge_msg, 1.0f, 0.85f, 0.15f, milestone_alpha);
+        // Bottom-Right: Shield & Active Power-Up Bar
+        if (treadmill.is_shield_active()) {
+            const char* sh_txt = "[SHIELD READY]";
+            float sh_w = HudRenderer::measure_text_width(sh_txt, char_w * 0.8f);
+            hud.draw_text(shader, ortho, vw - sh_w - pad, vh - 36.0f * base_scale,
+                          char_w * 0.8f, char_h * 0.8f, sh_txt, 0.05f, 0.95f, 1.0f, 1.0f);
         }
 
-        // Center state overlays
+        if (treadmill.get_active_powerup() != PowerUpType::NONE) {
+            const char* pu_name =
+                (treadmill.get_active_powerup() == PowerUpType::OVERDRIVE) ? "OVERDRIVE" :
+                (treadmill.get_active_powerup() == PowerUpType::SLOW_MO)   ? "SLOW-MO" : "MAGNET";
+            float bar_w = 130.0f * base_scale;
+            float bar_h = 8.0f * base_scale;
+            float bar_x = (vw - bar_w) * 0.5f;
+            float bar_y = 66.0f * base_scale;
+
+            hud.draw_box(shader, ortho, bar_x, bar_y, bar_w, bar_h, 0.08f, 0.12f, 0.22f, 0.85f);
+            hud.draw_box(shader, ortho, bar_x, bar_y, bar_w * treadmill.get_powerup_progress(), bar_h, 1.0f, 0.30f, 0.90f, 0.95f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, bar_y + 12.0f * base_scale,
+                                   char_w * 0.78f, char_h * 0.78f, pu_name, 1.0f, 0.85f, 0.2f, 1.0f);
+        }
+
+        // Floating Alert Banner (Near Miss, Shield Smash, Power-Up, or Dodge Milestone)
+        if (treadmill.get_banner_timer() > 0.0f) {
+            float alpha = std::min(1.0f, treadmill.get_banner_timer() * 1.5f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, 92.0f * base_scale,
+                                   char_w * 1.05f, char_h * 1.05f,
+                                   treadmill.get_banner_text(), 1.0f, 0.90f, 0.15f, alpha);
+        } else if (treadmill.get_dodge_milestone_timer() > 0.0f) {
+            char dodge_msg[32];
+            std::snprintf(dodge_msg, sizeof(dodge_msg), "%d+ DODGES!", treadmill.get_dodge_milestone());
+            float milestone_alpha = std::min(1.0f, treadmill.get_dodge_milestone_timer());
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, 92.0f * base_scale,
+                                   char_w * 1.05f, char_h * 1.05f,
+                                   dodge_msg, 0.1f, 1.0f, 0.6f, milestone_alpha);
+        }
+
+        // State Overlays
         if (state == GameState::COUNTDOWN) {
             const float pulse = 0.92f + 0.08f *
                 std::sin((1.0f - std::max(0.0f, countdown_timer)) * 12.0f);
 
             char countdown_text[8];
             if (countdown_value == 0) {
-                snprintf(countdown_text, sizeof(countdown_text), "GO!");
+                std::snprintf(countdown_text, sizeof(countdown_text), "GO!");
             } else {
-                snprintf(countdown_text, sizeof(countdown_text), "%d", countdown_value);
+                std::snprintf(countdown_text, sizeof(countdown_text), "%d", countdown_value);
             }
 
-            float count_w = char_w * 2.8f;
-            float count_h = char_h * 2.8f;
-            float count_x =
-                (static_cast<float>(view_width) - count_w *
-                 static_cast<float>(strlen(countdown_text)) * 0.72f) * 0.5f;
-            float count_y = static_cast<float>(view_height) * 0.36f;
-
-            hud.draw_box(shader, ortho,
-                         0.0f, 0.0f,
-                         static_cast<float>(view_width),
-                         static_cast<float>(view_height),
-                         0.005f, 0.01f, 0.025f, 0.28f);
-
-            hud.draw_text(shader, ortho,
-                          count_x, count_y,
-                          count_w, count_h,
-                          countdown_text,
-                          0.0f, 0.95f, 1.0f, pulse);
+            hud.draw_box(shader, ortho, 0.0f, 0.0f, vw, vh, 0.005f, 0.01f, 0.025f, 0.28f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, vh * 0.38f,
+                                   char_w * 2.8f, char_h * 2.8f,
+                                   countdown_text, 0.0f, 0.95f, 1.0f, pulse);
         } else if (state == GameState::READY) {
-            float box_w = 320.0f * base_scale;
-            float box_h = 140.0f * base_scale;
-            float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
-            float by = (static_cast<float>(view_height) - box_h) * 0.42f;
+            float box_w = 360.0f * base_scale;
+            float box_h = 260.0f * base_scale;
+            float bx = (vw - box_w) * 0.5f;
+            float by = (vh - box_h) * 0.42f;
 
-            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.01f, 0.03f, 0.08f, 0.85f);
+            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.01f, 0.03f, 0.09f, 0.90f);
             hud.draw_box(shader, ortho, bx, by, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
             hud.draw_box(shader, ortho, bx, by + box_h - 2.0f * base_scale, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
 
-            float t_w = char_w * 1.35f;
-            float t_h = char_h * 1.35f;
-            float tx = (static_cast<float>(view_width) - 10.0f * t_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, tx, by + 20.0f * base_scale, t_w, t_h, "VELOSPHERE", 0.0f, 0.95f, 1.0f, 1.0f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 16.0f * base_scale,
+                                   char_w * 1.35f, char_h * 1.35f, "VELOSPHERE 2.0", 0.0f, 0.95f, 1.0f, 1.0f);
 
-            float sx = (static_cast<float>(view_width) - 14.0f * char_w * 0.9f * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, sx, by + 65.0f * base_scale, char_w * 0.9f, char_h * 0.9f, "SWIPE TO STEER", 0.8f, 0.9f, 1.0f, 0.85f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 54.0f * base_scale,
+                                   char_w * 0.78f, char_h * 0.78f, "SWIPE L/R STEER - SWIPE UP JUMP", 0.8f, 0.9f, 1.0f, 0.88f);
 
-            float px = (static_cast<float>(view_width) - 17.0f * char_w * 0.95f * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, px, by + 95.0f * base_scale, char_w * 0.95f, char_h * 0.95f, "TAP SCREEN TO RUN", 1.0f, 0.85f, 0.2f, 1.0f);
+            // Mode selector button
+            Rect2D mode_btn = get_ready_mode_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, mode_btn.x, mode_btn.y, mode_btn.w, mode_btn.h, 0.05f, 0.12f, 0.24f, 0.95f);
+            const char* mode_label =
+                (treadmill.get_game_mode() == GameMode::TIME_ATTACK) ? "MODE: TIME ATTACK (90S)" :
+                (treadmill.get_game_mode() == GameMode::HARDCORE)    ? "MODE: HARDCORE (2X PTS)" :
+                                                                       "MODE: ENDLESS ARCADE";
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, mode_btn.y + 9.0f * base_scale,
+                                   char_w * 0.82f, char_h * 0.82f, mode_label, 0.2f, 0.95f, 1.0f, 1.0f);
+
+            // Skin selector button
+            Rect2D skin_btn = get_ready_skin_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, skin_btn.x, skin_btn.y, skin_btn.w, skin_btn.h, 0.05f, 0.12f, 0.24f, 0.95f);
+            char skin_label[48];
+            std::snprintf(skin_label, sizeof(skin_label), "SKIN: %s", skin.name);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, skin_btn.y + 9.0f * base_scale,
+                                   char_w * 0.82f, char_h * 0.82f, skin_label,
+                                   skin.core_color.r, skin.core_color.g, skin.core_color.b, 1.0f);
+
+            // Audio & Haptics button
+            Rect2D aud_btn = get_ready_audio_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, aud_btn.x, aud_btn.y, aud_btn.w, aud_btn.h, 0.04f, 0.09f, 0.18f, 0.95f);
+            char aud_label[48];
+            std::snprintf(aud_label, sizeof(aud_label), "AUDIO: %s  HAPTIC: %s",
+                          save.sfx_enabled ? "ON" : "OFF",
+                          save.haptics_enabled ? "ON" : "OFF");
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, aud_btn.y + 8.0f * base_scale,
+                                   char_w * 0.78f, char_h * 0.78f, aud_label, 0.85f, 0.9f, 1.0f, 0.9f);
+
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 224.0f * base_scale,
+                                   char_w * 0.95f, char_h * 0.95f, "TAP ANYWHERE TO LAUNCH", 1.0f, 0.85f, 0.2f, 1.0f);
         } else if (state == GameState::PAUSED) {
             float box_w = 340.0f * base_scale;
-            float box_h = 155.0f * base_scale;
-            float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
-            float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+            float box_h = 210.0f * base_scale;
+            float bx = (vw - box_w) * 0.5f;
+            float by = (vh - box_h) * 0.40f;
 
-            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.01f, 0.03f, 0.08f, 0.90f);
+            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.01f, 0.03f, 0.08f, 0.92f);
             hud.draw_box(shader, ortho, bx, by, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
             hud.draw_box(shader, ortho, bx, by + box_h - 2.0f * base_scale, box_w, 2.0f * base_scale, 0.0f, 0.95f, 1.0f, 1.0f);
 
-            float pause_w = char_w * 1.35f;
-            float pause_h = char_h * 1.35f;
-            float px = (static_cast<float>(view_width) - 11.0f * pause_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, px, by + 24.0f * base_scale,
-                          pause_w, pause_h, "GAME PAUSED", 0.0f, 0.95f, 1.0f, 1.0f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 20.0f * base_scale,
+                                   char_w * 1.3f, char_h * 1.3f, "GAME PAUSED", 0.0f, 0.95f, 1.0f, 1.0f);
 
-            float rx = (static_cast<float>(view_width) - 15.0f * char_w * 0.95f * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, rx, by + 82.0f * base_scale,
-                          char_w * 0.95f, char_h * 0.95f,
-                          "TAP TO RESUME", 1.0f, 0.85f, 0.2f, 1.0f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 68.0f * base_scale,
+                                   char_w * 0.95f, char_h * 0.95f, "TAP TO RESUME", 1.0f, 0.85f, 0.2f, 1.0f);
+
+            Rect2D rst_btn = get_pause_restart_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, rst_btn.x, rst_btn.y, rst_btn.w, rst_btn.h, 0.06f, 0.14f, 0.26f, 0.95f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, rst_btn.y + 9.0f * base_scale,
+                                   char_w * 0.85f, char_h * 0.85f, "RESTART RUN", 0.2f, 0.95f, 1.0f, 1.0f);
+
+            Rect2D menu_btn = get_pause_menu_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, menu_btn.x, menu_btn.y, menu_btn.w, menu_btn.h, 0.08f, 0.06f, 0.16f, 0.95f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, menu_btn.y + 9.0f * base_scale,
+                                   char_w * 0.85f, char_h * 0.85f, "MAIN MENU", 1.0f, 0.55f, 0.75f, 1.0f);
         } else if (state == GameState::GAME_OVER) {
-            float box_w = 340.0f * base_scale;
-            float box_h = 190.0f * base_scale;
-            float bx = (static_cast<float>(view_width) - box_w) * 0.5f;
-            float by = (static_cast<float>(view_height) - box_h) * 0.40f;
+            float box_w = 350.0f * base_scale;
+            float box_h = 250.0f * base_scale;
+            float bx = (vw - box_w) * 0.5f;
+            float by = (vh - box_h) * 0.40f;
 
-            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.07f, 0.01f, 0.03f, 0.88f);
+            hud.draw_box(shader, ortho, bx, by, box_w, box_h, 0.07f, 0.01f, 0.03f, 0.90f);
             hud.draw_box(shader, ortho, bx, by, box_w, 2.0f * base_scale, 1.0f, 0.2f, 0.35f, 1.0f);
             hud.draw_box(shader, ortho, bx, by + box_h - 2.0f * base_scale, box_w, 2.0f * base_scale, 1.0f, 0.2f, 0.35f, 1.0f);
 
-            float go_w = char_w * 1.4f;
-            float go_h = char_h * 1.4f;
-            float gx = (static_cast<float>(view_width) - 9.0f * go_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, gx, by + 18.0f * base_scale, go_w, go_h, "GAME OVER", 1.0f, 0.25f, 0.35f, 1.0f);
+            const char* header_str = treadmill.is_time_expired() ? "TIME UP!" : "GAME OVER";
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 16.0f * base_scale,
+                                   char_w * 1.35f, char_h * 1.35f, header_str, 1.0f, 0.25f, 0.35f, 1.0f);
 
             if (treadmill.has_new_best()) {
-                float nb_w = char_w * 1.05f;
-                float nb_h = char_h * 1.05f;
-                const char* new_best_text = "NEW BEST!";
-                float nb_text_width =
-                    static_cast<float>(strlen(new_best_text)) * nb_w * 1.12f;
-                float nb_x =
-                    (static_cast<float>(view_width) - nb_text_width) * 0.5f;
-
-                hud.draw_text(shader, ortho,
-                              nb_x, by + 49.0f * base_scale,
-                              nb_w, nb_h,
-                              new_best_text,
-                              1.0f, 0.85f, 0.15f, 1.0f);
+                hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 46.0f * base_scale,
+                                       char_w * 1.0f, char_h * 1.0f, "NEW RECORD!", 1.0f, 0.85f, 0.15f, 1.0f);
             }
 
             char fin_str[32];
-            snprintf(fin_str, sizeof(fin_str), "SCORE  %d", treadmill.get_score());
-            float fx = (static_cast<float>(view_width) - static_cast<float>(strlen(fin_str)) * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, fx, by + 78.0f * base_scale, char_w, char_h, fin_str, 1.0f, 1.0f, 1.0f, 1.0f);
+            std::snprintf(fin_str, sizeof(fin_str), "SCORE  %d", treadmill.get_score());
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 74.0f * base_scale,
+                                   char_w, char_h, fin_str, 1.0f, 1.0f, 1.0f, 1.0f);
 
             char bst_res[32];
-            snprintf(bst_res, sizeof(bst_res), "BEST   %d", high_score);
-            float bx_pos = (static_cast<float>(view_width) - static_cast<float>(strlen(bst_res)) * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, bx_pos, by + 108.0f * base_scale, char_w, char_h, bst_res, 1.0f, 0.85f, 0.2f, 1.0f);
+            std::snprintf(bst_res, sizeof(bst_res), "BEST   %d", mode_best);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 102.0f * base_scale,
+                                   char_w, char_h, bst_res, 1.0f, 0.85f, 0.2f, 1.0f);
 
-            float rx = (static_cast<float>(view_width) - 12.0f * char_w * 1.12f) * 0.5f;
-            hud.draw_text(shader, ortho, rx, by + 145.0f * base_scale, char_w, char_h, "TAP TO RETRY", 0.0f, 0.95f, 1.0f, 1.0f);
+            char stats_str[48];
+            std::snprintf(stats_str, sizeof(stats_str), "+%d ORBS  MAX COMBO X%d",
+                          treadmill.get_run_orbs(), treadmill.get_best_run_combo());
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 132.0f * base_scale,
+                                   char_w * 0.82f, char_h * 0.82f, stats_str, 0.3f, 1.0f, 0.65f, 0.95f);
+
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, by + 166.0f * base_scale,
+                                   char_w * 0.98f, char_h * 0.98f, "TAP TO RETRY", 0.0f, 0.95f, 1.0f, 1.0f);
+
+            Rect2D menu_btn = get_gameover_menu_button_rect(view_width, view_height);
+            hud.draw_box(shader, ortho, menu_btn.x, menu_btn.y, menu_btn.w, menu_btn.h, 0.12f, 0.04f, 0.08f, 0.95f);
+            hud.draw_text_centered(shader, ortho, vw * 0.5f, menu_btn.y + 9.0f * base_scale,
+                                   char_w * 0.82f, char_h * 0.82f, "MAIN MENU", 0.9f, 0.8f, 0.95f, 1.0f);
         }
     }
 
@@ -662,6 +854,7 @@ public:
         particles.destroy();
         hud.destroy();
         sphere_mesh.destroy();
+        orb_mesh.destroy();
         box_mesh.destroy();
         rail_mesh.destroy();
         track_mesh.destroy();
@@ -670,7 +863,7 @@ public:
 };
 
 // =============================================================================
-// APP STATE & ENGINE CONTROLLER
+// APP STATE & PERSISTENCE CONTROLLER
 // =============================================================================
 
 struct AppState {
@@ -682,138 +875,185 @@ struct AppState {
     GameState           game_state{GameState::READY};
     PlayerBall          player{};
     TreadmillSystem     treadmill{};
+    SaveData            save_data{};
 
-    // Countdown state: 3 -> 2 -> 1 -> GO! before gameplay starts.
     float               countdown_timer{0.0f};
     int                 countdown_value{3};
 
     bool                animating{false};
     float               death_shake_timer{0.0f};
-    int                 high_score{0};
 
-    // Touch input state
+    // Touch & gesture state
     bool                touch_active{false};
+    float               touch_down_x{0.0f};
+    float               touch_down_y{0.0f};
     float               last_touch_x{0.0f};
+    float               last_touch_y{0.0f};
+    bool                vertical_gesture_consumed{false};
 
-    // Logging throttle
     float               log_throttle{0.0f};
 };
 
-// Persistent high score helpers
 static std::string get_save_file_path(struct android_app* app) {
+    if (app && app->activity && app->activity->internalDataPath) {
+        return std::string(app->activity->internalDataPath) + "/velosphere_save.dat";
+    }
+    return "";
+}
+
+static std::string get_legacy_save_file_path(struct android_app* app) {
     if (app && app->activity && app->activity->internalDataPath) {
         return std::string(app->activity->internalDataPath) + "/highscore.dat";
     }
     return "";
 }
 
-static int load_saved_high_score(struct android_app* app) {
-    std::string path = get_save_file_path(app);
-    if (path.empty()) return 0;
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return 0;
-    int hs = 0;
-    if (fread(&hs, sizeof(int), 1, f) == 1) {
-        LOGI("VeloSphere: Loaded persistent high score: %d from %s", hs, path.c_str());
-    } else {
-        hs = 0;
-    }
-    fclose(f);
-    return hs;
-}
-
-static void play_hit_sound(struct android_app* app) {
-    if (!app || !app->activity || !app->activity->vm ||
-        !app->activity->javaGameActivity) {
-        return;
-    }
-
-    JavaVM* vm = app->activity->vm;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            return;
-        }
-        attached = true;
-    }
-
-    jclass activity_class =
-        env->GetObjectClass(app->activity->javaGameActivity);
-
-    if (activity_class) {
-        jmethodID play_method =
-            env->GetStaticMethodID(activity_class, "playHitSound", "()V");
-
-        if (play_method) {
-            env->CallStaticVoidMethod(activity_class, play_method);
-        }
-
-        if (env->ExceptionCheck()) {
-            env->ExceptionDescribe();
-            env->ExceptionClear();
-        }
-
-        env->DeleteLocalRef(activity_class);
-    }
-
-    if (attached) {
-        vm->DetachCurrentThread();
-    }
-}
-
-static void trigger_haptic(struct android_app* app, int duration_ms, int amplitude) {
-    if (!app || !app->activity || !app->activity->vm ||
-        !app->activity->javaGameActivity) {
-        return;
-    }
-
-    JavaVM* vm = app->activity->vm;
-    JNIEnv* env = nullptr;
-    bool attached = false;
-
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
-        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            return;
-        }
-        attached = true;
-    }
-
-    jclass activity_class =
-        env->GetObjectClass(app->activity->javaGameActivity);
-
-    if (activity_class) {
-        jmethodID vibrate_method =
-            env->GetStaticMethodID(activity_class, "vibrate", "(II)V");
-
-        if (vibrate_method) {
-            env->CallStaticVoidMethod(activity_class, vibrate_method,
-                                      duration_ms, amplitude);
-        }
-
-        if (env->ExceptionCheck()) {
-            env->ExceptionDescribe();
-            env->ExceptionClear();
-        }
-
-        env->DeleteLocalRef(activity_class);
-    }
-
-    if (attached) {
-        vm->DetachCurrentThread();
-    }
-}
-
-static void save_high_score(struct android_app* app, int score) {
+static void save_profile_data(struct android_app* app, SaveData& data) {
+    data.seal();
     std::string path = get_save_file_path(app);
     if (path.empty()) return;
     FILE* f = fopen(path.c_str(), "wb");
     if (f) {
-        fwrite(&score, sizeof(int), 1, f);
+        fwrite(&data, sizeof(SaveData), 1, f);
         fclose(f);
-        LOGI("VeloSphere: Persisted high score: %d to %s", score, path.c_str());
     }
+    // Also mirror high_score to legacy highscore.dat for backward compatibility
+    std::string legacy_path = get_legacy_save_file_path(app);
+    if (!legacy_path.empty()) {
+        FILE* lf = fopen(legacy_path.c_str(), "wb");
+        if (lf) {
+            fwrite(&data.high_score, sizeof(int), 1, lf);
+            fclose(lf);
+        }
+    }
+}
+
+static SaveData load_profile_data(struct android_app* app) {
+    SaveData data{};
+    data.seal();
+
+    std::string path = get_save_file_path(app);
+    if (!path.empty()) {
+        FILE* f = fopen(path.c_str(), "rb");
+        if (f) {
+            SaveData loaded{};
+            if (fread(&loaded, sizeof(SaveData), 1, f) == 1 && loaded.is_valid()) {
+                fclose(f);
+                LOGI("VeloSphere: Loaded verified v2 SaveData (Best: %d, Orbs: %d)",
+                     loaded.high_score, loaded.total_orbs);
+                return loaded;
+            }
+            fclose(f);
+        }
+    }
+
+    // Fallback migration from legacy v1 highscore.dat
+    std::string legacy = get_legacy_save_file_path(app);
+    if (!legacy.empty()) {
+        FILE* lf = fopen(legacy.c_str(), "rb");
+        if (lf) {
+            int hs = 0;
+            if (fread(&hs, sizeof(int), 1, lf) == 1 && hs > 0) {
+                data.high_score = hs;
+                data.seal();
+                LOGI("VeloSphere: Migrated legacy high score %d to v2 SaveData", hs);
+            }
+            fclose(lf);
+        }
+    }
+    return data;
+}
+
+// JNI Audio & Haptics Helpers
+static void call_java_sfx(struct android_app* app, int sfx_type) {
+    if (!app || !app->activity || !app->activity->vm || !app->activity->javaGameActivity) return;
+
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+
+    jclass cls = env->GetObjectClass(app->activity->javaGameActivity);
+    if (cls) {
+        jmethodID mid = env->GetStaticMethodID(cls, "playSfx", "(I)V");
+        if (mid) {
+            env->CallStaticVoidMethod(cls, mid, sfx_type);
+        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+    }
+
+    if (attached) vm->DetachCurrentThread();
+}
+
+static void trigger_haptic(struct android_app* app, int duration_ms, int amplitude) {
+    if (!app || !app->activity || !app->activity->vm || !app->activity->javaGameActivity) return;
+
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+
+    jclass cls = env->GetObjectClass(app->activity->javaGameActivity);
+    if (cls) {
+        jmethodID mid = env->GetStaticMethodID(cls, "vibrate", "(II)V");
+        if (mid) {
+            env->CallStaticVoidMethod(cls, mid, duration_ms, amplitude);
+        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+    }
+
+    if (attached) vm->DetachCurrentThread();
+}
+
+static void sync_java_settings(struct android_app* app, const SaveData& save) {
+    if (!app || !app->activity || !app->activity->vm || !app->activity->javaGameActivity) return;
+
+    JavaVM* vm = app->activity->vm;
+    JNIEnv* env = nullptr;
+    bool attached = false;
+
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+
+    jclass cls = env->GetObjectClass(app->activity->javaGameActivity);
+    if (cls) {
+        jmethodID mid = env->GetStaticMethodID(cls, "updateSettings", "(ZZZ)V");
+        if (mid) {
+            env->CallStaticVoidMethod(cls, mid,
+                                      static_cast<jboolean>(save.music_enabled != 0),
+                                      static_cast<jboolean>(save.sfx_enabled != 0),
+                                      static_cast<jboolean>(save.haptics_enabled != 0));
+        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+    }
+
+    if (attached) vm->DetachCurrentThread();
+}
+
+static void finalize_run(AppState* state) {
+    int final_score = state->treadmill.get_score();
+    state->save_data.total_orbs += state->treadmill.get_run_orbs();
+    state->save_data.total_runs += 1;
+    state->save_data.total_dodges += state->treadmill.get_dodge_count();
+    if (state->treadmill.get_best_run_combo() > state->save_data.best_combo) {
+        state->save_data.best_combo = state->treadmill.get_best_run_combo();
+    }
+    state->save_data.update_best_for_mode(state->treadmill.get_game_mode(), final_score);
+    state->treadmill.set_best_score(state->save_data.get_best_for_mode(state->treadmill.get_game_mode()));
+    save_profile_data(state->app, state->save_data);
 }
 
 static void on_app_cmd(struct android_app* app, int32_t cmd) {
@@ -833,59 +1073,36 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
             break;
 
         case APP_CMD_WINDOW_RESIZED:
-            LOGI("Lifecycle: APP_CMD_WINDOW_RESIZED");
-            state->egl.update_dimensions();
-            break;
-
         case APP_CMD_CONFIG_CHANGED:
-            LOGI("Lifecycle: APP_CMD_CONFIG_CHANGED");
             state->egl.update_dimensions();
             break;
 
         case APP_CMD_TERM_WINDOW:
-            LOGI("Lifecycle: APP_CMD_TERM_WINDOW");
             state->animating = false;
-            save_high_score(state->app, state->high_score);
+            save_profile_data(state->app, state->save_data);
             state->renderer.destroy();
             state->egl.terminate();
             break;
 
         case APP_CMD_GAINED_FOCUS:
-            LOGI("Lifecycle: APP_CMD_GAINED_FOCUS");
+        case APP_CMD_RESUME:
             state->animating = true;
             state->timer.reset();
+            sync_java_settings(state->app, state->save_data);
             break;
 
         case APP_CMD_LOST_FOCUS:
-            LOGI("Lifecycle: APP_CMD_LOST_FOCUS");
-            if (state->game_state == GameState::PLAYING ||
-                state->game_state == GameState::COUNTDOWN) {
-                state->game_state = GameState::PAUSED;
-                LOGI("VeloSphere: Game paused (lost focus).");
-            }
-            state->animating = false;
-            break;
-
-        case APP_CMD_RESUME:
-            LOGI("Lifecycle: APP_CMD_RESUME");
-            state->animating = true;
-            state->timer.reset();
-            break;
-
         case APP_CMD_PAUSE:
-            LOGI("Lifecycle: APP_CMD_PAUSE");
             if (state->game_state == GameState::PLAYING ||
                 state->game_state == GameState::COUNTDOWN) {
                 state->game_state = GameState::PAUSED;
-                LOGI("VeloSphere: Game paused (activity paused).");
             }
             state->animating = false;
-            save_high_score(state->app, state->high_score);
+            save_profile_data(state->app, state->save_data);
             break;
 
         case APP_CMD_DESTROY:
-            LOGI("Lifecycle: APP_CMD_DESTROY");
-            save_high_score(state->app, state->high_score);
+            save_profile_data(state->app, state->save_data);
             state->renderer.destroy();
             state->egl.terminate();
             break;
@@ -895,10 +1112,12 @@ static void on_app_cmd(struct android_app* app, int32_t cmd) {
     }
 }
 
-// Process touch/drag motion events from GameActivity
 static void process_input_events(AppState* state) {
     android_input_buffer* input_buffer = android_app_swap_input_buffers(state->app);
     if (!input_buffer) return;
+
+    const int vw = state->egl.width;
+    const int vh = state->egl.height;
 
     for (size_t i = 0; i < input_buffer->motionEventsCount; ++i) {
         GameActivityMotionEvent& event = input_buffer->motionEvents[i];
@@ -907,60 +1126,126 @@ static void process_input_events(AppState* state) {
         if (event.pointerCount > 0) {
             float x = GameActivityPointerAxes_getAxisValue(&event.pointers[0], AMOTION_EVENT_AXIS_X);
             float y = GameActivityPointerAxes_getAxisValue(&event.pointers[0], AMOTION_EVENT_AXIS_Y);
-            (void)y; // Silence unused warning
 
             if (action == AMOTION_EVENT_ACTION_DOWN) {
                 state->touch_active = true;
+                state->touch_down_x = x;
+                state->touch_down_y = y;
                 state->last_touch_x = x;
+                state->last_touch_y = y;
+                state->vertical_gesture_consumed = false;
 
-                const bool pause_button =
-                    is_pause_button_pressed(x, y, state->egl.width);
+                const bool pause_btn = get_pause_button_rect(vw).contains(x, y);
 
                 if ((state->game_state == GameState::PLAYING ||
-                     state->game_state == GameState::COUNTDOWN) &&
-                    pause_button) {
+                     state->game_state == GameState::COUNTDOWN) && pause_btn) {
                     state->game_state = GameState::PAUSED;
                     state->timer.reset();
-                    LOGI("VeloSphere: Game Paused by button.");
-                } else if (state->game_state == GameState::PAUSED &&
-                           pause_button) {
-                    state->game_state =
-                        (state->countdown_timer > 0.0f &&
-                         state->countdown_value >= 0)
-                            ? GameState::COUNTDOWN
-                            : GameState::PLAYING;
-                    state->timer.reset();
-                    LOGI("VeloSphere: Game Resumed by button.");
                 } else if (state->game_state == GameState::READY) {
-                    state->countdown_timer = 1.0f;
-                    state->countdown_value = 3;
-                    state->game_state = GameState::COUNTDOWN;
-                    LOGI("VeloSphere: Countdown started.");
+                    if (get_ready_mode_button_rect(vw, vh).contains(x, y)) {
+                        int next_mode = (static_cast<int>(state->treadmill.get_game_mode()) + 1) % 3;
+                        state->save_data.selected_mode = next_mode;
+                        state->treadmill.set_game_mode(static_cast<GameMode>(next_mode));
+                        state->treadmill.set_best_score(state->save_data.get_best_for_mode(state->treadmill.get_game_mode()));
+                        save_profile_data(state->app, state->save_data);
+                        call_java_sfx(state->app, 1);
+                    } else if (get_ready_skin_button_rect(vw, vh).contains(x, y)) {
+                        int count = static_cast<int>(SphereSkin::COUNT);
+                        int next_skin = (state->save_data.selected_skin + 1) % count;
+                        if (!state->save_data.is_skin_unlocked(next_skin)) {
+                            state->save_data.try_unlock_skin(next_skin);
+                        }
+                        if (state->save_data.is_skin_unlocked(next_skin)) {
+                            state->save_data.selected_skin = next_skin;
+                        } else {
+                            // Find next unlocked skin
+                            for (int s = 1; s <= count; ++s) {
+                                int cand = (state->save_data.selected_skin + s) % count;
+                                if (state->save_data.is_skin_unlocked(cand)) {
+                                    state->save_data.selected_skin = cand;
+                                    break;
+                                }
+                            }
+                        }
+                        save_profile_data(state->app, state->save_data);
+                        call_java_sfx(state->app, 1);
+                    } else if (get_ready_audio_button_rect(vw, vh).contains(x, y)) {
+                        uint8_t next_val = state->save_data.sfx_enabled ? 0 : 1;
+                        state->save_data.sfx_enabled = next_val;
+                        state->save_data.music_enabled = next_val;
+                        state->save_data.haptics_enabled = next_val;
+                        save_profile_data(state->app, state->save_data);
+                        sync_java_settings(state->app, state->save_data);
+                    } else {
+                        state->treadmill.reset();
+                        state->player.reset();
+                        state->countdown_timer = 1.0f;
+                        state->countdown_value = 3;
+                        state->game_state = GameState::COUNTDOWN;
+                    }
                 } else if (state->game_state == GameState::PAUSED) {
-                    state->game_state =
-                        (state->countdown_value >= 0 && state->countdown_timer > 0.0f)
-                            ? GameState::COUNTDOWN
-                            : GameState::PLAYING;
-                    state->timer.reset();
-                    LOGI("VeloSphere: Game Resumed!");
+                    if (get_pause_restart_button_rect(vw, vh).contains(x, y)) {
+                        state->treadmill.reset();
+                        state->player.reset();
+                        state->death_shake_timer = 0.0f;
+                        state->game_state = GameState::PLAYING;
+                        state->timer.reset();
+                    } else if (get_pause_menu_button_rect(vw, vh).contains(x, y)) {
+                        state->treadmill.reset();
+                        state->player.reset();
+                        state->game_state = GameState::READY;
+                        state->timer.reset();
+                    } else {
+                        state->game_state =
+                            (state->countdown_value >= 0 && state->countdown_timer > 0.0f)
+                                ? GameState::COUNTDOWN
+                                : GameState::PLAYING;
+                        state->timer.reset();
+                    }
                 } else if (state->game_state == GameState::GAME_OVER) {
-                    // Tap to restart
-                    state->treadmill.reset();
-                    state->player.reset();
-                    state->death_shake_timer = 0.0f;
-                    state->game_state = GameState::PLAYING;
-                    LOGI("VeloSphere: Game Restarted!");
+                    if (get_gameover_menu_button_rect(vw, vh).contains(x, y)) {
+                        state->treadmill.reset();
+                        state->player.reset();
+                        state->death_shake_timer = 0.0f;
+                        state->game_state = GameState::READY;
+                    } else {
+                        state->treadmill.reset();
+                        state->player.reset();
+                        state->death_shake_timer = 0.0f;
+                        state->game_state = GameState::PLAYING;
+                    }
                 }
             } else if (action == AMOTION_EVENT_ACTION_MOVE) {
-                if (state->touch_active && state->egl.width > 0) {
-                    float dx = (x - state->last_touch_x) / static_cast<float>(state->egl.width);
+                if (state->touch_active && vw > 0) {
+                    float dx = (x - state->last_touch_x) / static_cast<float>(vw);
+                    float total_dy = y - state->touch_down_y;
+                    float scale = hud_base_scale(vw);
+
                     if (state->game_state == GameState::PLAYING) {
                         state->player.apply_touch_delta(dx);
+
+                        // Vertical swipe detection for Jump / Slam
+                        if (!state->vertical_gesture_consumed) {
+                            if (total_dy < -34.0f * scale) {
+                                if (state->player.jump()) {
+                                    call_java_sfx(state->app, 4);
+                                    trigger_haptic(state->app, 25, 80);
+                                }
+                                state->vertical_gesture_consumed = true;
+                            } else if (total_dy > 34.0f * scale) {
+                                if (state->player.slam()) {
+                                    trigger_haptic(state->app, 35, 120);
+                                }
+                                state->vertical_gesture_consumed = true;
+                            }
+                        }
                     }
                     state->last_touch_x = x;
+                    state->last_touch_y = y;
                 }
             } else if (action == AMOTION_EVENT_ACTION_UP || action == AMOTION_EVENT_ACTION_CANCEL) {
                 state->touch_active = false;
+                state->vertical_gesture_consumed = false;
             }
         }
     }
@@ -979,7 +1264,7 @@ void android_main(struct android_app* app) {
     using namespace velo;
 
     LOGI("=================================================");
-    LOGI("   VeloSphere Engine - Modern 3D Arcade Runner   ");
+    LOGI("   VeloSphere 2.0 - Production 3D Arcade Engine  ");
     LOGI("=================================================");
 
     AppState state{};
@@ -987,15 +1272,15 @@ void android_main(struct android_app* app) {
     app->userData = &state;
     app->onAppCmd = on_app_cmd;
 
-    // Load persistent high score from internal storage
-    state.high_score = load_saved_high_score(app);
-    state.treadmill.set_best_score(state.high_score);
+    state.save_data = load_profile_data(app);
+    state.treadmill.set_game_mode(static_cast<GameMode>(std::clamp(state.save_data.selected_mode, 0, 2)));
+    state.treadmill.set_best_score(state.save_data.get_best_for_mode(state.treadmill.get_game_mode()));
+    sync_java_settings(app, state.save_data);
 
     while (!app->destroyRequested) {
         int events = 0;
         struct android_poll_source* source = nullptr;
 
-        // Non-blocking poll while animating, blocking poll when paused/minimized
         while (ALooper_pollOnce(state.animating ? 0 : -1, nullptr, &events, reinterpret_cast<void**>(&source)) >= 0) {
             if (source != nullptr) {
                 source->process(app, source);
@@ -1005,77 +1290,89 @@ void android_main(struct android_app* app) {
             }
         }
 
-        // Process touch controls
         process_input_events(&state);
 
-        // Active rendering & physics update loop
         if (state.animating && state.egl.is_ready) {
             const float dt = state.timer.tick();
 
-            // State-specific gameplay logic
             if (state.game_state == GameState::COUNTDOWN) {
-                // Freeze gameplay during the countdown. The last half-second
-                // shows GO!, then normal gameplay begins.
                 state.countdown_timer -= dt;
-
                 if (state.countdown_timer <= 0.0f) {
                     if (state.countdown_value > 0) {
                         --state.countdown_value;
-                        state.countdown_timer =
-                            (state.countdown_value == 0) ? 0.5f : 1.0f;
+                        state.countdown_timer = (state.countdown_value == 0) ? 0.5f : 1.0f;
                     } else {
                         state.game_state = GameState::PLAYING;
                         state.countdown_timer = 0.0f;
-                        LOGI("VeloSphere: GO! Game started.");
                     }
                 }
             } else if (state.game_state == GameState::PLAYING) {
-                // 1. Advance treadmill coordinate system and global speed
-                const float previous_dodge_milestone_timer =
-                    state.treadmill.get_dodge_milestone_timer();
-                state.treadmill.update(dt);
+                const float prev_milestone = state.treadmill.get_dodge_milestone_timer();
+                state.treadmill.update(dt, state.player.pos);
 
-                // Give a light haptic pulse exactly once when a new
-                // 50/100/150... dodge milestone is reached.
-                if (state.treadmill.get_dodge_milestone_timer() >
-                    previous_dodge_milestone_timer) {
+                if (state.treadmill.get_dodge_milestone_timer() > prev_milestone) {
                     trigger_haptic(state.app, 60, 100);
                 }
 
-                // 2. Advance player lateral movement and rolling rotation
                 state.player.update(dt, state.treadmill.get_global_speed());
 
-                // Spawn friction sparks on sharp high-speed steering
-                if (std::abs(state.player.lateral_velocity) > 4.0f) {
+                if (std::abs(state.player.lateral_velocity) > 4.0f && !state.player.is_airborne) {
                     state.renderer.particles.spawn_trail_sparks(state.player.pos, state.player.lateral_velocity);
                 }
 
-                // 3. Collision detection: Player Sphere vs Hazard Obstacles
-                if (CollisionSystem::check_collision(state.player, state.treadmill)) {
-                    play_hit_sound(state.app);
+                // Resolve pickups, shield smashes, overdrive smashes, and lethal hits
+                InteractionOutcome outcome = CollisionSystem::resolve_interactions(state.player, state.treadmill);
+
+                if (outcome.orb_picked_up) {
+                    call_java_sfx(state.app, 1);
+                    trigger_haptic(state.app, 18, 60);
+                    state.renderer.particles.spawn_orb_burst(state.player.pos);
+                }
+                if (outcome.powerup_picked_up) {
+                    call_java_sfx(state.app, 2);
+                    trigger_haptic(state.app, 45, 140);
+                    state.renderer.particles.spawn_orb_burst(state.player.pos, {0.1f, 0.95f, 1.0f});
+                }
+                if (outcome.obstacle_smashed || outcome.shield_broken) {
+                    call_java_sfx(state.app, 3);
+                    trigger_haptic(state.app, 90, 190);
+                    state.death_shake_timer = 0.30f;
+                    state.renderer.particles.spawn_shield_shatter(outcome.impact_pos);
+                }
+
+                if (outcome.lethal_collision) {
+                    call_java_sfx(state.app, 0);
                     trigger_haptic(state.app, 140, 230);
-                    state.game_state = GameState::GAME_OVER;
-                    state.death_shake_timer = 0.65f;
 
-                    // Trigger realistic collision impact tumble and explosion sparks
-                    state.player.trigger_collision();
-                    state.renderer.particles.spawn_explosion(state.player.pos);
-
-                    int final_score = state.treadmill.get_score();
-                    if (final_score > state.high_score) {
-                        state.high_score = final_score;
-                        state.treadmill.set_best_score(final_score);
-                        save_high_score(state.app, final_score);
-                        LOGI("VeloSphere: [NEW RECORD!] Score: %d persisted!", final_score);
+                    if (state.treadmill.get_game_mode() == GameMode::TIME_ATTACK) {
+                        // In Time Attack, hitting an obstacle deducts 10s & resets combo; ends run if clock hits 0
+                        state.treadmill.reset_combo();
+                        state.treadmill.apply_time_penalty(10.0f);
+                        state.treadmill.trigger_banner("-10S PENALTY!", 1.1f);
+                        state.player.invulnerable_timer = 1.2f;
+                        state.death_shake_timer = 0.45f;
+                        state.renderer.particles.spawn_explosion(state.player.pos);
+                    } else {
+                        state.game_state = GameState::GAME_OVER;
+                        state.death_shake_timer = 0.65f;
+                        state.player.trigger_collision();
+                        state.renderer.particles.spawn_explosion(state.player.pos);
+                        finalize_run(&state);
                     }
-                    LOGI("VeloSphere: [COLLISION] GAME OVER! Final Score: %d | Best: %d",
-                         final_score, state.high_score);
+                }
+
+                if (state.treadmill.is_time_expired() && state.game_state == GameState::PLAYING) {
+                    call_java_sfx(state.app, 0);
+                    trigger_haptic(state.app, 120, 180);
+                    state.game_state = GameState::GAME_OVER;
+                    finalize_run(&state);
+                }
+
+                if (state.death_shake_timer > 0.0f) {
+                    state.death_shake_timer = std::max(0.0f, state.death_shake_timer - dt);
                 }
             } else if (state.game_state == GameState::READY) {
-                // Slow idle drift while waiting for start
                 state.player.update(dt, 4.0f);
-            } else if (state.game_state == GameState::PAUSED) {
-                // Gameplay is intentionally frozen while paused.
             } else if (state.game_state == GameState::GAME_OVER) {
                 state.player.update(dt, 0.0f);
                 if (state.death_shake_timer > 0.0f) {
@@ -1083,46 +1380,36 @@ void android_main(struct android_app* app) {
                 }
             }
 
-            // Update spark particle physics
             state.renderer.particles.update(dt);
 
-            // Periodic Logcat statistics (~2 per second)
             state.log_throttle += dt;
             if (state.log_throttle >= 0.5f) {
                 state.log_throttle = 0.0f;
-                const char* state_str =
-                    (state.game_state == GameState::PLAYING)   ? "PLAYING" :
-                    (state.game_state == GameState::COUNTDOWN) ? "COUNTDOWN" :
-                    (state.game_state == GameState::PAUSED)   ? "PAUSED (Tap to resume)" :
-                    (state.game_state == GameState::READY)    ? "READY (Tap to start)" : "GAME OVER (Tap to retry)";
-
-                LOGI("[VeloSphere] State: %s | Score: %d | Best: %d | Speed: %.1f u/s | Ball X: %.2f",
-                     state_str,
+                LOGI("[VeloSphere] Score: %d | Best: %d | Combo: x%d | Orbs: %d | Speed: %.1f u/s",
                      state.treadmill.get_score(),
-                     state.high_score,
-                     state.treadmill.get_global_speed(),
-                     state.player.pos.x);
+                     state.save_data.high_score,
+                     state.treadmill.get_combo(),
+                     state.save_data.total_orbs + state.treadmill.get_run_orbs(),
+                     state.treadmill.get_global_speed());
             }
 
-            // 4. Render 3D scene & Arcade HUD
             state.renderer.render_frame(
                 state.player,
                 state.treadmill,
+                state.save_data,
                 state.game_state,
                 state.egl.width,
                 state.egl.height,
                 state.death_shake_timer,
-                state.high_score,
                 state.countdown_timer,
                 state.countdown_value
             );
 
-            // 5. Swap front and back display buffers
             state.egl.swap_buffers();
         }
     }
 
-    save_high_score(state.app, state.high_score);
+    save_profile_data(state.app, state.save_data);
     state.renderer.destroy();
     state.egl.terminate();
     LOGI("VeloSphere Engine Terminated Cleanly.");

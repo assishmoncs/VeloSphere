@@ -2,11 +2,22 @@
 
 #include <cmath>
 #include <array>
+#include <algorithm>
 
 namespace velo {
 
 constexpr float PI = 3.14159265358979323846f;
-inline float to_radians(float degrees) { return degrees * (PI / 180.0f); }
+inline constexpr float to_radians(float degrees) { return degrees * (PI / 180.0f); }
+inline constexpr float to_degrees(float radians) { return radians * (180.0f / PI); }
+
+inline constexpr float lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+inline float smoothstep(float edge0, float edge1, float x) {
+    float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
 
 struct Vec3 {
     float x{0.0f};
@@ -16,14 +27,20 @@ struct Vec3 {
     constexpr Vec3() = default;
     constexpr Vec3(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
 
-    Vec3 operator+(const Vec3& o) const { return {x + o.x, y + o.y, z + o.z}; }
-    Vec3 operator-(const Vec3& o) const { return {x - o.x, y - o.y, z - o.z}; }
-    Vec3 operator*(float s) const { return {x * s, y * s, z * s}; }
+    constexpr Vec3 operator+(const Vec3& o) const { return {x + o.x, y + o.y, z + o.z}; }
+    constexpr Vec3 operator-(const Vec3& o) const { return {x - o.x, y - o.y, z - o.z}; }
+    constexpr Vec3 operator-() const { return {-x, -y, -z}; }
+    constexpr Vec3 operator*(float s) const { return {x * s, y * s, z * s}; }
+    constexpr Vec3 operator/(float s) const {
+        float inv = (std::abs(s) > 1e-6f) ? (1.0f / s) : 0.0f;
+        return {x * inv, y * inv, z * inv};
+    }
+
     Vec3& operator+=(const Vec3& o) { x += o.x; y += o.y; z += o.z; return *this; }
     Vec3& operator-=(const Vec3& o) { x -= o.x; y -= o.y; z -= o.z; return *this; }
     Vec3& operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
 
-    float length_sq() const { return x * x + y * y + z * z; }
+    constexpr float length_sq() const { return x * x + y * y + z * z; }
     float length() const { return std::sqrt(length_sq()); }
 
     Vec3 normalized() const {
@@ -35,17 +52,39 @@ struct Vec3 {
         return {0.0f, 0.0f, 0.0f};
     }
 
-    static float dot(const Vec3& a, const Vec3& b) {
+    static constexpr float dot(const Vec3& a, const Vec3& b) {
         return a.x * b.x + a.y * b.y + a.z * b.z;
     }
 
-    static Vec3 cross(const Vec3& a, const Vec3& b) {
+    static constexpr Vec3 cross(const Vec3& a, const Vec3& b) {
         return {
             a.y * b.z - a.z * b.y,
             a.z * b.x - a.x * b.z,
             a.x * b.y - a.y * b.x
         };
     }
+
+    static constexpr Vec3 lerp(const Vec3& a, const Vec3& b, float t) {
+        return {
+            velo::lerp(a.x, b.x, t),
+            velo::lerp(a.y, b.y, t),
+            velo::lerp(a.z, b.z, t)
+        };
+    }
+
+    static constexpr float distance_sq(const Vec3& a, const Vec3& b) {
+        return (a - b).length_sq();
+    }
+
+    static float distance(const Vec3& a, const Vec3& b) {
+        return (a - b).length();
+    }
+};
+
+struct Color3 {
+    float r{1.0f};
+    float g{1.0f};
+    float b{1.0f};
 };
 
 /**
@@ -179,6 +218,18 @@ struct Mat4 {
         res.m[14] = Vec3::dot(f, eye);
         res.m[15] = 1.0f;
         return res;
+    }
+
+    Vec3 transform_point(const Vec3& p) const {
+        float x = m[0] * p.x + m[4] * p.y + m[8]  * p.z + m[12];
+        float y = m[1] * p.x + m[5] * p.y + m[9]  * p.z + m[13];
+        float z = m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14];
+        float w = m[3] * p.x + m[7] * p.y + m[11] * p.z + m[15];
+        if (std::abs(w) > 1e-6f && std::abs(w - 1.0f) > 1e-6f) {
+            float inv_w = 1.0f / w;
+            return {x * inv_w, y * inv_w, z * inv_w};
+        }
+        return {x, y, z};
     }
 
     Mat4 operator*(const Mat4& o) const {

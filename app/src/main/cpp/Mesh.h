@@ -4,16 +4,12 @@
 #include <vector>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include "Math3D.h"
 #include "Shader.h"
 
 namespace velo {
 
-/**
- * Vertex structure for GLES 3.0.
- * Default initializers are provided to satisfy Clang-Tidy warnings,
- * though fields are primarily used for raw GPU buffer uploads.
- */
 struct Vertex {
     Vec3  position{};
     Vec3  normal{};
@@ -438,10 +434,9 @@ public:
     GLuint ebo{0};
     QuadMesh box_mesh;
 
-    static constexpr int MAX_CHARS = 128;
+    static constexpr int MAX_CHARS = 512;
 
     void init() {
-        // Generate procedural font texture atlas (128x64)
         uint8_t tex_data[128 * 64];
         std::fill_n(tex_data, 128 * 64, 0);
 
@@ -470,7 +465,6 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        // Dynamic buffer for batching quads
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
 
@@ -506,6 +500,12 @@ public:
         glBindVertexArray(0);
 
         box_mesh.init(1.0f, 1.0f);
+    }
+
+    static float measure_text_width(const char* text, float char_w) {
+        if (!text || *text == '\0') return 0.0f;
+        size_t len = std::strlen(text);
+        return static_cast<float>(len) * char_w * 1.12f;
     }
 
     void draw_text(const ShaderProgram& shader, const Mat4& ortho_vp,
@@ -558,7 +558,7 @@ public:
         glDisable(GL_DEPTH_TEST);
 
         shader.use();
-        shader.set_shading_mode(4); // HUD Text Mode
+        shader.set_shading_mode(4);
         shader.set_mvp(ortho_vp);
         shader.set_color(r, g, b, a);
 
@@ -574,6 +574,14 @@ public:
         glDisable(GL_BLEND);
     }
 
+    void draw_text_centered(const ShaderProgram& shader, const Mat4& ortho_vp,
+                            float center_x, float y, float char_w, float char_h,
+                            const char* text, float r, float g, float b, float a = 1.0f) {
+        if (!text) return;
+        float w = measure_text_width(text, char_w);
+        draw_text(shader, ortho_vp, center_x - w * 0.5f, y, char_w, char_h, text, r, g, b, a);
+    }
+
     void draw_box(const ShaderProgram& shader, const Mat4& ortho_vp,
                   float x, float y, float w, float h,
                   float r, float g, float b, float a) const {
@@ -582,7 +590,7 @@ public:
         glDisable(GL_DEPTH_TEST);
 
         shader.use();
-        shader.set_shading_mode(5); // Solid HUD Quad Mode
+        shader.set_shading_mode(5);
         Mat4 model = Mat4::translate(x + w * 0.5f, y + h * 0.5f, 0.0f) * Mat4::scale(w, h, 1.0f);
         shader.set_mvp(ortho_vp * model);
         shader.set_color(r, g, b, a);
@@ -609,7 +617,7 @@ public:
 };
 
 // =============================================================================
-// SPARK & IMPACT PARTICLE SYSTEM
+// SPARK, PICKUP & SHIELD SHATTER PARTICLE SYSTEM
 // =============================================================================
 
 struct SparkParticle {
@@ -624,7 +632,7 @@ struct SparkParticle {
 
 class ParticleSystem {
 public:
-    static constexpr size_t POOL_SIZE = 64;
+    static constexpr size_t POOL_SIZE = 128;
     std::array<SparkParticle, POOL_SIZE> particles{};
     QuadMesh quad;
 
@@ -633,11 +641,11 @@ public:
     }
 
     void spawn_explosion(const Vec3& origin) {
-        for (size_t i = 0; i < POOL_SIZE; ++i) {
+        for (size_t i = 0; i < 64; ++i) {
             auto& p = particles[i];
             p.active = true;
             p.pos = origin;
-            float angle = (static_cast<float>(i) / static_cast<float>(POOL_SIZE)) * 2.0f * PI;
+            float angle = (static_cast<float>(i) / 64.0f) * 2.0f * PI;
             float speed = 4.0f + static_cast<float>(i % 7) * 1.5f;
 
             p.vel = {
@@ -646,7 +654,6 @@ public:
                 -3.0f + std::sin(angle) * speed
             };
 
-            // Electric neon fire colors (yellow, amber, magenta, cyan)
             if (i % 3 == 0)      p.color = {1.0f, 0.85f, 0.1f};
             else if (i % 3 == 1) p.color = {1.0f, 0.2f, 0.4f};
             else                 p.color = {0.1f, 0.9f, 1.0f};
@@ -657,18 +664,61 @@ public:
         }
     }
 
+    void spawn_orb_burst(const Vec3& origin, const Vec3& burst_color = {1.0f, 0.88f, 0.15f}) {
+        size_t spawned = 0;
+        for (size_t i = 0; i < POOL_SIZE && spawned < 16; ++i) {
+            auto& p = particles[i];
+            if (p.active) continue;
+            p.active = true;
+            p.pos = origin;
+            float angle = (static_cast<float>(spawned) / 16.0f) * 2.0f * PI;
+            float spd = 3.5f + static_cast<float>(spawned % 4) * 1.2f;
+            p.vel = {
+                std::cos(angle) * spd,
+                2.5f + static_cast<float>(spawned % 3) * 1.1f,
+                std::sin(angle) * spd - 4.0f
+            };
+            p.color = burst_color;
+            p.size = 0.16f;
+            p.life = 0.0f;
+            p.max_life = 0.38f;
+            ++spawned;
+        }
+    }
+
+    void spawn_shield_shatter(const Vec3& origin) {
+        size_t spawned = 0;
+        for (size_t i = 0; i < POOL_SIZE && spawned < 32; ++i) {
+            auto& p = particles[i];
+            if (p.active) continue;
+            p.active = true;
+            p.pos = origin;
+            float angle = (static_cast<float>(spawned) / 32.0f) * 2.0f * PI;
+            float spd = 5.5f + static_cast<float>(spawned % 5) * 1.6f;
+            p.vel = {
+                std::cos(angle) * spd,
+                3.0f + static_cast<float>(spawned % 4) * 1.2f,
+                std::sin(angle) * spd
+            };
+            p.color = (spawned % 2 == 0) ? Vec3{0.0f, 0.95f, 1.0f} : Vec3{1.0f, 0.3f, 0.9f};
+            p.size = 0.22f;
+            p.life = 0.0f;
+            p.max_life = 0.50f;
+            ++spawned;
+        }
+    }
+
     void spawn_trail_sparks(const Vec3& origin, float lateral_vel) {
-        // Spawn 2 subtle friction sparks on hard turns
         size_t spawned = 0;
         for (auto& p : particles) {
             if (!p.active && spawned < 2) {
                 p.active = true;
                 p.pos = origin;
-                p.pos.y = 0.10f; // Track surface contact
+                p.pos.y = std::max(0.10f, origin.y - 0.55f);
                 p.vel = {
                     -lateral_vel * 0.3f + (static_cast<float>(spawned) - 0.5f) * 1.5f,
                     1.2f + static_cast<float>(spawned) * 0.5f,
-                    -12.0f // fly backward relative to treadmill
+                    -12.0f
                 };
                 p.color = {0.2f, 0.95f, 1.0f};
                 p.size = 0.12f;
@@ -689,7 +739,7 @@ public:
             }
 
             p.pos += p.vel * dt;
-            p.vel.y -= 14.0f * dt; // gravity
+            p.vel.y -= 14.0f * dt;
             if (p.pos.y < 0.05f) {
                 p.pos.y = 0.05f;
                 p.vel.y = -p.vel.y * 0.3f;
@@ -701,11 +751,11 @@ public:
 
     void draw(const ShaderProgram& shader, const Mat4& vp) const {
         glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending for neon sparks
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
         glDepthMask(GL_FALSE);
 
         shader.use();
-        shader.set_shading_mode(6); // Radial spark mode
+        shader.set_shading_mode(6);
 
         for (const auto& p : particles) {
             if (!p.active) continue;
