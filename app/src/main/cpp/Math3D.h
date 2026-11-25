@@ -19,6 +19,14 @@ inline float smoothstep(float edge0, float edge1, float x) {
     return t * t * (3.0f - 2.0f * t);
 }
 
+struct Vec2 {
+    float x{0.0f};
+    float y{0.0f};
+
+    constexpr Vec2() = default;
+    constexpr Vec2(float x_, float y_) : x(x_), y(y_) {}
+};
+
 struct Vec3 {
     float x{0.0f};
     float y{0.0f};
@@ -85,6 +93,25 @@ struct Color3 {
     float r{1.0f};
     float g{1.0f};
     float b{1.0f};
+
+    static constexpr Color3 lerp(const Color3& a, const Color3& b, float t) {
+        return {
+            velo::lerp(a.r, b.r, t),
+            velo::lerp(a.g, b.g, t),
+            velo::lerp(a.b, b.b, t)
+        };
+    }
+};
+
+struct Rect2D {
+    float x{0.0f};
+    float y{0.0f};
+    float w{0.0f};
+    float h{0.0f};
+
+    constexpr bool contains(float px, float py) const {
+        return px >= x && px <= (x + w) && py >= y && py <= (y + h);
+    }
 };
 
 /**

@@ -11,12 +11,24 @@
 
 namespace velo {
 
+// =============================================================================
+// GAME STATES, MODES & USER SETTINGS
+// =============================================================================
+
 enum class GameState {
-    READY,
+    HOME,
+    GARAGE,
+    MISSIONS,
+    SETTINGS,
     COUNTDOWN,
     PLAYING,
     PAUSED,
     GAME_OVER
+};
+
+enum class GarageTab : int {
+    SKINS    = 0,
+    UPGRADES = 1
 };
 
 enum class GameMode : int {
@@ -25,13 +37,36 @@ enum class GameMode : int {
     HARDCORE    = 2  // High base speed, no shields, 2x score & orb multiplier
 };
 
+enum class GraphicsQuality : uint8_t {
+    LOW    = 0, // Reduced particles, fast sky, optimal for budget GPUs
+    MEDIUM = 1, // Balanced visual effects & 60 FPS stability
+    HIGH   = 2  // Full neon horizon, max particles & trail fidelity
+};
+
+enum class ControlScheme : uint8_t {
+    DRAG        = 0, // Smooth continuous horizontal drag steering
+    SWIPE_LANES = 1  // Crisp left/right flick snaps cleanly between 3 lanes
+};
+
+enum class SensitivityLevel : uint8_t {
+    LOW    = 0,
+    MEDIUM = 1,
+    HIGH   = 2
+};
+
+// =============================================================================
+// SPHERE SKINS (7 UNLOCKABLE SYNTHWAVE SKINS)
+// =============================================================================
+
 enum class SphereSkin : int {
     CYBER_CYAN       = 0,
     SOLAR_FLARE      = 1,
     VOID_VIOLET      = 2,
     EMERALD_MATRIX   = 3,
     SUPERNOVA_CHROME = 4,
-    COUNT            = 5
+    PHANTOM_GOLD     = 5,
+    PRISM_PULSE      = 6,
+    COUNT            = 7
 };
 
 struct SkinPalette {
@@ -41,13 +76,47 @@ struct SkinPalette {
     Color3      energy_color;
 };
 
-inline constexpr std::array<SkinPalette, 5> SKIN_PALETTES = {{
+inline constexpr std::array<SkinPalette, 7> SKIN_PALETTES = {{
     {"CYBER CYAN",     0,   {0.12f, 0.95f, 0.88f}, {1.00f, 0.25f, 0.80f}},
     {"SOLAR FLARE",    50,  {1.00f, 0.72f, 0.10f}, {1.00f, 0.15f, 0.20f}},
     {"VOID VIOLET",    120, {0.48f, 0.18f, 0.98f}, {0.05f, 0.95f, 1.00f}},
     {"EMERALD MATRIX", 200, {0.08f, 0.96f, 0.38f}, {0.95f, 1.00f, 0.15f}},
-    {"SUPERNOVA",      350, {0.95f, 0.96f, 1.00f}, {1.00f, 0.20f, 0.95f}}
+    {"SUPERNOVA",      350, {0.95f, 0.96f, 1.00f}, {1.00f, 0.20f, 0.95f}},
+    {"PHANTOM GOLD",   500, {1.00f, 0.84f, 0.18f}, {1.00f, 0.98f, 0.70f}},
+    {"PRISM PULSE",    750, {0.98f, 0.20f, 0.75f}, {0.08f, 1.00f, 0.92f}}
 }};
+
+// =============================================================================
+// PERMANENT TECH UPGRADES (4 MODULES, LEVELS 0..5)
+// =============================================================================
+
+enum class UpgradeType : int {
+    SHIELD_CAP         = 0, // Stronger shield, Lv3+ starts run with Aegis Shield
+    MAGNET_COIL        = 1, // Longer Magnet duration & wider pull radius
+    CHRONO_CORE        = 2, // Longer Slow-Mo & bonus score multiplier in Slow-Mo
+    OVERDRIVE_THRUSTER = 3, // Longer Overdrive & faster Hyperflow/Fever charge
+    COUNT              = 4
+};
+
+struct UpgradeInfo {
+    const char* name;
+    const char* short_desc;
+    Color3      accent;
+};
+
+inline constexpr std::array<UpgradeInfo, 4> UPGRADE_CATALOG = {{
+    {"AEGIS CAPACITOR", "START SHIELD LV3+",  {0.05f, 0.95f, 1.00f}},
+    {"MAGNET COIL",     "WIDER ORB PULL",     {0.15f, 1.00f, 0.45f}},
+    {"CHRONO CORE",     "LONGER SLOW-MO",     {0.62f, 0.38f, 1.00f}},
+    {"HYPER THRUSTER",  "FASTER FEVER FILL",  {1.00f, 0.25f, 0.85f}}
+}};
+
+inline constexpr int MAX_UPGRADE_LEVEL = 5;
+inline constexpr std::array<int, MAX_UPGRADE_LEVEL> UPGRADE_COSTS = {40, 80, 140, 220, 320};
+
+// =============================================================================
+// DYNAMIC SYNTHWAVE BIOMES (SMOOTHLY INTERPOLATED)
+// =============================================================================
 
 struct BiomePalette {
     const char* name;
@@ -55,16 +124,110 @@ struct BiomePalette {
     Color3      grid_color;
     Color3      rail_color;
     Color3      sky_fog;
+    Color3      sun_top;
+    Color3      sun_bottom;
 };
 
 inline constexpr std::array<BiomePalette, 4> BIOME_PALETTES = {{
-    {"NEON GRID",    {0.03f, 0.04f, 0.09f}, {0.00f, 0.85f, 1.00f}, {0.00f, 0.92f, 1.00f}, {0.02f, 0.03f, 0.06f}},
-    {"SOLAR OUTRUN", {0.08f, 0.02f, 0.07f}, {1.00f, 0.45f, 0.15f}, {1.00f, 0.20f, 0.65f}, {0.06f, 0.01f, 0.05f}},
-    {"CYBER MATRIX", {0.01f, 0.06f, 0.04f}, {0.10f, 0.98f, 0.45f}, {0.35f, 1.00f, 0.25f}, {0.01f, 0.04f, 0.02f}},
-    {"VOID HORIZON", {0.04f, 0.02f, 0.10f}, {0.65f, 0.25f, 1.00f}, {0.00f, 0.95f, 1.00f}, {0.02f, 0.01f, 0.07f}}
+    {"NEON GRID",    {0.03f, 0.04f, 0.09f}, {0.00f, 0.85f, 1.00f}, {0.00f, 0.92f, 1.00f}, {0.03f, 0.03f, 0.09f}, {1.00f, 0.82f, 0.25f}, {1.00f, 0.16f, 0.62f}},
+    {"SOLAR OUTRUN", {0.08f, 0.02f, 0.07f}, {1.00f, 0.45f, 0.15f}, {1.00f, 0.20f, 0.65f}, {0.08f, 0.02f, 0.07f}, {1.00f, 0.95f, 0.35f}, {1.00f, 0.25f, 0.12f}},
+    {"CYBER MATRIX", {0.01f, 0.06f, 0.04f}, {0.10f, 0.98f, 0.45f}, {0.35f, 1.00f, 0.25f}, {0.01f, 0.05f, 0.04f}, {0.55f, 1.00f, 0.45f}, {0.00f, 0.78f, 0.68f}},
+    {"VOID HORIZON", {0.04f, 0.02f, 0.10f}, {0.65f, 0.25f, 1.00f}, {0.00f, 0.95f, 1.00f}, {0.03f, 0.01f, 0.09f}, {0.95f, 0.40f, 1.00f}, {0.25f, 0.20f, 1.00f}}
 }};
 
-// The runner has exactly three playable lanes.
+// =============================================================================
+// ROTATING MISSION SYSTEM
+// =============================================================================
+
+enum class MissionType : uint8_t {
+    COLLECT_ORBS      = 0, // Cumulative orbs collected
+    DODGE_OBSTACLES   = 1, // Cumulative obstacles dodged
+    SCORE_NEAR_MISSES = 2, // Cumulative near misses
+    REACH_DISTANCE    = 3, // Cumulative distance traveled (meters)
+    REACH_COMBO       = 4, // Reach a specific combo multiplier in a run
+    TRIGGER_FEVER     = 5, // Trigger Hyperflow/Fever activations
+    COUNT             = 6
+};
+
+struct MissionSlot {
+    uint8_t  type{0};
+    uint8_t  tier{1};
+    uint16_t reward_orbs{40};
+    int32_t  target{20};
+    int32_t  progress{0};
+
+    void format_title(char* buf, size_t buf_size) const {
+        switch (static_cast<MissionType>(type)) {
+            case MissionType::COLLECT_ORBS:
+                std::snprintf(buf, buf_size, "COLLECT %d DATA ORBS", target);
+                break;
+            case MissionType::DODGE_OBSTACLES:
+                std::snprintf(buf, buf_size, "DODGE %d OBSTACLES", target);
+                break;
+            case MissionType::SCORE_NEAR_MISSES:
+                std::snprintf(buf, buf_size, "SCORE %d NEAR MISSES", target);
+                break;
+            case MissionType::REACH_DISTANCE:
+                std::snprintf(buf, buf_size, "TRAVEL %d METERS", target);
+                break;
+            case MissionType::REACH_COMBO:
+                std::snprintf(buf, buf_size, "REACH %dX COMBO", target);
+                break;
+            case MissionType::TRIGGER_FEVER:
+                std::snprintf(buf, buf_size, "TRIGGER HYPERFLOW %dX", target);
+                break;
+            default:
+                std::snprintf(buf, buf_size, "COMPLETE RUN");
+                break;
+        }
+    }
+
+    float progress_ratio() const {
+        if (target <= 0) return 1.0f;
+        return std::clamp(static_cast<float>(progress) / static_cast<float>(target), 0.0f, 1.0f);
+    }
+};
+
+inline MissionSlot make_mission(MissionType type, uint8_t tier) {
+    MissionSlot m{};
+    m.type = static_cast<uint8_t>(type);
+    m.tier = std::max<uint8_t>(1, tier);
+    int t = static_cast<int>(m.tier);
+    switch (type) {
+        case MissionType::COLLECT_ORBS:
+            m.target = 15 + (t - 1) * 12;
+            m.reward_orbs = static_cast<uint16_t>(35 + (t - 1) * 15);
+            break;
+        case MissionType::DODGE_OBSTACLES:
+            m.target = 20 + (t - 1) * 18;
+            m.reward_orbs = static_cast<uint16_t>(40 + (t - 1) * 15);
+            break;
+        case MissionType::SCORE_NEAR_MISSES:
+            m.target = 3 + (t - 1) * 3;
+            m.reward_orbs = static_cast<uint16_t>(45 + (t - 1) * 20);
+            break;
+        case MissionType::REACH_DISTANCE:
+            m.target = 350 + (t - 1) * 250;
+            m.reward_orbs = static_cast<uint16_t>(40 + (t - 1) * 15);
+            break;
+        case MissionType::REACH_COMBO:
+            m.target = std::min(5, 2 + t);
+            m.reward_orbs = static_cast<uint16_t>(35 + (t - 1) * 20);
+            break;
+        case MissionType::TRIGGER_FEVER:
+        default:
+            m.target = std::min(5, t);
+            m.reward_orbs = static_cast<uint16_t>(50 + (t - 1) * 25);
+            break;
+    }
+    m.progress = 0;
+    return m;
+}
+
+// =============================================================================
+// LANES, OBSTACLES & POWER-UPS
+// =============================================================================
+
 enum class TrackLane : int {
     LEFT   = 0,
     CENTER = 1,
@@ -81,17 +244,17 @@ enum class ObstacleType : int {
 enum class PowerUpType : int {
     NONE      = 0,
     SHIELD    = 1, // Absorbs 1 obstacle impact and shatters it (+300 pts)
-    OVERDRIVE = 2, // 5.0s speed boost + invulnerable obstacle smash (+200 pts)
-    SLOW_MO   = 3, // 6.0s time dilation (0.65x obstacle speed)
-    MAGNET    = 4  // 8.0s magnetic pull attracting all nearby Data Orbs
+    OVERDRIVE = 2, // Speed boost + invulnerable obstacle smash (+200 pts)
+    SLOW_MO   = 3, // Time dilation (0.68x obstacle speed)
+    MAGNET    = 4  // Magnetic pull attracting all nearby Data Orbs
 };
 
 // =============================================================================
-// VERSIONED SAVE DATA WITH CRC32 INTEGRITY CHECK
+// VERSIONED SAVE DATA WITH CRC32 INTEGRITY CHECK (v3 + v2 MIGRATION)
 // =============================================================================
 
-struct SaveData {
-    static constexpr uint32_t MAGIC   = 0x56454C4F; // "VELO"
+struct SaveDataV2 {
+    static constexpr uint32_t MAGIC   = 0x56454C4F;
     static constexpr uint32_t VERSION = 2;
 
     uint32_t magic{MAGIC};
@@ -103,7 +266,7 @@ struct SaveData {
     int32_t  best_combo{1};
     int32_t  total_runs{0};
     int32_t  total_dodges{0};
-    uint32_t unlocked_skins_mask{0x01}; // Bit 0 = CYBER_CYAN unlocked
+    uint32_t unlocked_skins_mask{0x01};
     int32_t  selected_skin{0};
     int32_t  selected_mode{0};
     uint8_t  sfx_enabled{1};
@@ -111,6 +274,85 @@ struct SaveData {
     uint8_t  haptics_enabled{1};
     uint8_t  reserved{0};
     uint32_t checksum{0};
+
+    uint32_t compute_checksum() const {
+        const auto* bytes = reinterpret_cast<const uint8_t*>(this);
+        const size_t len = offsetof(SaveDataV2, checksum);
+        uint32_t crc = 0xFFFFFFFFu;
+        for (size_t i = 0; i < len; ++i) {
+            crc ^= static_cast<uint32_t>(bytes[i]);
+            for (int b = 0; b < 8; ++b) {
+                crc = (crc >> 1) ^ (0xEDB88320u & (-(crc & 1u)));
+            }
+        }
+        return ~crc;
+    }
+
+    bool is_valid() const {
+        return magic == MAGIC && version == VERSION && checksum == compute_checksum();
+    }
+};
+
+struct SaveData {
+    static constexpr uint32_t MAGIC   = 0x56454C4F; // "VELO"
+    static constexpr uint32_t VERSION = 3;
+    static constexpr int      REVIVE_ORB_COST = 25;
+
+    uint32_t magic{MAGIC};
+    uint32_t version{VERSION};
+    int32_t  high_score{0};
+    int32_t  best_score_time_attack{0};
+    int32_t  best_score_hardcore{0};
+    int32_t  total_orbs{0};
+    int32_t  best_combo{1};
+    int32_t  total_runs{0};
+    int32_t  total_dodges{0};
+    int32_t  total_near_misses{0};
+    int32_t  total_distance_m{0};
+    int32_t  missions_completed{0};
+    uint32_t unlocked_skins_mask{0x01}; // Bit 0 = CYBER_CYAN unlocked
+    int32_t  selected_skin{0};
+    int32_t  selected_mode{0};
+    uint8_t  upgrade_levels[4]{0, 0, 0, 0};
+    MissionSlot missions[3]{};
+    uint8_t  sfx_enabled{1};
+    uint8_t  music_enabled{1};
+    uint8_t  haptics_enabled{1};
+    uint8_t  graphics_quality{static_cast<uint8_t>(GraphicsQuality::HIGH)};
+    uint8_t  control_scheme{static_cast<uint8_t>(ControlScheme::DRAG)};
+    uint8_t  sensitivity{static_cast<uint8_t>(SensitivityLevel::MEDIUM)};
+    uint8_t  show_fps{0};
+    uint8_t  reserved{0};
+    uint32_t checksum{0};
+
+    SaveData() {
+        init_default_missions();
+    }
+
+    void init_default_missions() {
+        missions[0] = make_mission(MissionType::COLLECT_ORBS, 1);
+        missions[1] = make_mission(MissionType::DODGE_OBSTACLES, 1);
+        missions[2] = make_mission(MissionType::SCORE_NEAR_MISSES, 1);
+    }
+
+    static SaveData migrate_from_v2(const SaveDataV2& old) {
+        SaveData d{};
+        d.high_score             = old.high_score;
+        d.best_score_time_attack = old.best_score_time_attack;
+        d.best_score_hardcore    = old.best_score_hardcore;
+        d.total_orbs             = old.total_orbs;
+        d.best_combo             = std::max(1, old.best_combo);
+        d.total_runs             = old.total_runs;
+        d.total_dodges           = old.total_dodges;
+        d.unlocked_skins_mask    = old.unlocked_skins_mask | 0x01u;
+        d.selected_skin          = std::clamp(old.selected_skin, 0, static_cast<int>(SphereSkin::COUNT) - 1);
+        d.selected_mode          = std::clamp(old.selected_mode, 0, 2);
+        d.sfx_enabled            = old.sfx_enabled;
+        d.music_enabled          = old.music_enabled;
+        d.haptics_enabled        = old.haptics_enabled;
+        d.seal();
+        return d;
+    }
 
     uint32_t compute_checksum() const {
         const auto* bytes = reinterpret_cast<const uint8_t*>(this);
@@ -153,6 +395,63 @@ struct SaveData {
         return false;
     }
 
+    int get_upgrade_level(UpgradeType type) const {
+        int idx = static_cast<int>(type);
+        if (idx < 0 || idx >= static_cast<int>(UpgradeType::COUNT)) return 0;
+        return std::clamp(static_cast<int>(upgrade_levels[idx]), 0, MAX_UPGRADE_LEVEL);
+    }
+
+    int get_next_upgrade_cost(UpgradeType type) const {
+        int lv = get_upgrade_level(type);
+        if (lv >= MAX_UPGRADE_LEVEL) return 0;
+        return UPGRADE_COSTS[static_cast<size_t>(lv)];
+    }
+
+    bool try_buy_upgrade(UpgradeType type) {
+        int idx = static_cast<int>(type);
+        if (idx < 0 || idx >= static_cast<int>(UpgradeType::COUNT)) return false;
+        int lv = get_upgrade_level(type);
+        if (lv >= MAX_UPGRADE_LEVEL) return false;
+        int cost = UPGRADE_COSTS[static_cast<size_t>(lv)];
+        if (total_orbs >= cost) {
+            total_orbs -= cost;
+            upgrade_levels[idx] = static_cast<uint8_t>(lv + 1);
+            seal();
+            return true;
+        }
+        return false;
+    }
+
+    bool try_spend_revive() {
+        if (total_orbs < REVIVE_ORB_COST) return false;
+        total_orbs -= REVIVE_ORB_COST;
+        seal();
+        return true;
+    }
+
+    int get_pilot_rank() const {
+        return 1 + (missions_completed / 3);
+    }
+
+    const char* get_pilot_title() const {
+        int rank = get_pilot_rank();
+        if (rank <= 1) return "ROOKIE";
+        if (rank == 2) return "PILOT";
+        if (rank == 3) return "RACER";
+        if (rank == 4) return "ACE";
+        if (rank == 5) return "PHANTOM";
+        return "LEGEND";
+    }
+
+    float get_touch_sensitivity_value() const {
+        switch (static_cast<SensitivityLevel>(sensitivity)) {
+            case SensitivityLevel::LOW:  return 5.4f;
+            case SensitivityLevel::HIGH: return 9.2f;
+            case SensitivityLevel::MEDIUM:
+            default:                     return 7.2f;
+        }
+    }
+
     int get_best_for_mode(GameMode mode) const {
         switch (mode) {
             case GameMode::TIME_ATTACK: return best_score_time_attack;
@@ -178,10 +477,55 @@ struct SaveData {
         if (updated) seal();
         return updated;
     }
+
+    // Advance mission progress; returns total bonus orbs awarded if any mission completed
+    int advance_missions(int delta_orbs, int delta_dodges, int delta_near_misses,
+                         int delta_distance_m, int current_combo, int delta_fevers) {
+        int orbs_rewarded = 0;
+        for (int i = 0; i < 3; ++i) {
+            MissionSlot& m = missions[i];
+            MissionType mt = static_cast<MissionType>(m.type);
+            switch (mt) {
+                case MissionType::COLLECT_ORBS:
+                    m.progress += delta_orbs;
+                    break;
+                case MissionType::DODGE_OBSTACLES:
+                    m.progress += delta_dodges;
+                    break;
+                case MissionType::SCORE_NEAR_MISSES:
+                    m.progress += delta_near_misses;
+                    break;
+                case MissionType::REACH_DISTANCE:
+                    m.progress += delta_distance_m;
+                    break;
+                case MissionType::REACH_COMBO:
+                    if (current_combo > m.progress) m.progress = current_combo;
+                    break;
+                case MissionType::TRIGGER_FEVER:
+                    m.progress += delta_fevers;
+                    break;
+                default:
+                    break;
+            }
+            if (m.progress >= m.target) {
+                orbs_rewarded += static_cast<int>(m.reward_orbs);
+                total_orbs += static_cast<int>(m.reward_orbs);
+                missions_completed += 1;
+                // Cycle to a fresh mission type with incremented tier
+                uint8_t next_type = static_cast<uint8_t>((m.type + 3 + i) % static_cast<int>(MissionType::COUNT));
+                uint8_t next_tier = static_cast<uint8_t>(std::min(12, static_cast<int>(m.tier) + 1));
+                m = make_mission(static_cast<MissionType>(next_type), next_tier);
+            }
+        }
+        if (orbs_rewarded > 0) {
+            seal();
+        }
+        return orbs_rewarded;
+    }
 };
 
 // =============================================================================
-// PATH SEGMENT (OBSTACLES, DATA ORBS & POWER-UPS)
+// PATH SEGMENT (OBSTACLES, DUAL-LANE WALLS, DATA ORBS & POWER-UPS)
 // =============================================================================
 
 struct PathSegment {
@@ -195,6 +539,11 @@ struct PathSegment {
     float obstacle_width{1.60f};
     float obstacle_height{1.50f};
     float obstacle_depth{1.00f};
+
+    // Optional second static blocker in another lane (always leaves >= 1 safe lane)
+    bool      has_second_obstacle{false};
+    TrackLane second_lane{TrackLane::LEFT};
+    float     second_obstacle_x{0.0f};
 
     bool  is_moving{false};
     float motion_phase{0.0f};
@@ -218,7 +567,7 @@ struct PathSegment {
 };
 
 // =============================================================================
-// PLAYER SPHERE PHYSICS (STEERING, BANKING, JUMPING & SLAMMING)
+// PLAYER SPHERE PHYSICS (STEERING, JUMP BUFFERING, SQUASH/STRETCH & SLAM)
 // =============================================================================
 
 class PlayerBall {
@@ -226,26 +575,32 @@ public:
     static constexpr float RADIUS            = 0.70f;
     static constexpr float TRACK_HALF_WIDTH  = 3.8f;
     static constexpr float LATERAL_BOUND     = TRACK_HALF_WIDTH - RADIUS - 0.2f;
-    static constexpr float STEER_RESPONSE    = 18.0f;
-    static constexpr float TOUCH_SENSITIVITY = 7.0f;
-    static constexpr float JUMP_VELOCITY     = 11.8f;
-    static constexpr float SLAM_VELOCITY     = -24.0f;
-    static constexpr float GRAVITY           = 32.0f;
+    static constexpr float STEER_RESPONSE    = 19.0f;
+    static constexpr float TOUCH_SENSITIVITY = 7.2f;
+    static constexpr float JUMP_VELOCITY     = 12.2f;
+    static constexpr float SLAM_VELOCITY     = -25.0f;
+    static constexpr float GRAVITY           = 33.0f;
+    static constexpr float JUMP_BUFFER_TIME  = 0.15f;
 
     Vec3  pos{0.0f, RADIUS, 0.0f};
     float target_x{0.0f};
+    int   current_lane{1}; // 0=LEFT, 1=CENTER, 2=RIGHT
     float roll_angle{0.0f};
     float lateral_roll_angle{0.0f};
     float tilt_angle{0.0f};
     float lateral_velocity{0.0f};
     float bounce_offset_y{0.0f};
 
-    // Jump & vertical dynamics
+    // Jump, input buffer & squash/stretch feel
     float jump_y{0.0f};
     float vertical_velocity{0.0f};
     bool  is_airborne{false};
+    float jump_buffer_timer{0.0f};
+    float scale_y{1.0f};
+    float scale_xz{1.0f};
+    bool  just_landed{false};
 
-    // Post-shield-break or overdrive invulnerability timer
+    // Post-shield-break, revive, or overdrive invulnerability timer
     float invulnerable_timer{0.0f};
 
     // Collision tumble state
@@ -258,6 +613,7 @@ public:
     void reset() {
         pos = {0.0f, RADIUS, 0.0f};
         target_x = 0.0f;
+        current_lane = 1;
         roll_angle = 0.0f;
         lateral_roll_angle = 0.0f;
         tilt_angle = 0.0f;
@@ -266,6 +622,10 @@ public:
         jump_y = 0.0f;
         vertical_velocity = 0.0f;
         is_airborne = false;
+        jump_buffer_timer = 0.0f;
+        scale_y = 1.0f;
+        scale_xz = 1.0f;
+        just_landed = false;
         invulnerable_timer = 0.0f;
         is_tumbling = false;
         tumble_pos = {0.0f, RADIUS, 0.0f};
@@ -274,10 +634,32 @@ public:
         tumble_ang_vel = {0.0f, 0.0f, 0.0f};
     }
 
+    void revive() {
+        is_tumbling = false;
+        jump_y = 0.0f;
+        vertical_velocity = 0.0f;
+        is_airborne = false;
+        jump_buffer_timer = 0.0f;
+        pos = {0.0f, RADIUS, 0.0f};
+        target_x = 0.0f;
+        current_lane = 1;
+        scale_y = 1.0f;
+        scale_xz = 1.0f;
+        invulnerable_timer = 2.2f;
+    }
+
     bool jump() {
-        if (is_tumbling || is_airborne) return false;
+        if (is_tumbling) return false;
+        if (is_airborne) {
+            // Buffer jump so pressing just before landing triggers instantaneously!
+            jump_buffer_timer = JUMP_BUFFER_TIME;
+            return false;
+        }
         is_airborne = true;
         vertical_velocity = JUMP_VELOCITY;
+        jump_buffer_timer = 0.0f;
+        scale_y = 1.24f;
+        scale_xz = 0.88f;
         return true;
     }
 
@@ -285,15 +667,27 @@ public:
         if (is_tumbling || !is_airborne) return false;
         if (vertical_velocity > SLAM_VELOCITY * 0.5f) {
             vertical_velocity = SLAM_VELOCITY;
+            scale_y = 1.28f;
+            scale_xz = 0.85f;
             return true;
         }
         return false;
     }
 
     void update(float dt, float forward_speed) {
+        just_landed = false;
+
         if (invulnerable_timer > 0.0f) {
             invulnerable_timer = std::max(0.0f, invulnerable_timer - dt);
         }
+        if (jump_buffer_timer > 0.0f) {
+            jump_buffer_timer = std::max(0.0f, jump_buffer_timer - dt);
+        }
+
+        // Smooth elastic recovery of squash & stretch
+        float spring = std::min(1.0f, 14.0f * dt);
+        scale_y  += (1.0f - scale_y) * spring;
+        scale_xz += (1.0f - scale_xz) * spring;
 
         if (is_tumbling) {
             update_tumble(dt);
@@ -327,8 +721,17 @@ public:
             vertical_velocity -= GRAVITY * dt;
             if (jump_y <= 0.0f) {
                 jump_y = 0.0f;
+                bool hard_slam = (vertical_velocity < -18.0f);
                 vertical_velocity = 0.0f;
                 is_airborne = false;
+                just_landed = true;
+                scale_y = hard_slam ? 0.68f : 0.80f;
+                scale_xz = hard_slam ? 1.24f : 1.14f;
+
+                // Execute buffered jump immediately on touchdown
+                if (jump_buffer_timer > 0.0f) {
+                    jump();
+                }
             }
             bounce_offset_y = 0.0f;
         } else {
@@ -364,47 +767,63 @@ public:
     void apply_touch_delta(float delta_x_screenspace, float touch_sensitivity = TOUCH_SENSITIVITY) {
         target_x += delta_x_screenspace * touch_sensitivity;
         target_x = std::clamp(target_x, -LATERAL_BOUND, LATERAL_BOUND);
+        // Keep current_lane synced with closest lane
+        constexpr float lane_w = (TRACK_HALF_WIDTH * 2.0f) / 3.0f;
+        if (target_x < -lane_w * 0.5f) current_lane = 0;
+        else if (target_x > lane_w * 0.5f) current_lane = 2;
+        else current_lane = 1;
     }
 
     void steer_to_lane(int lane_delta) {
-        constexpr float step = (TRACK_HALF_WIDTH * 2.0f) / 3.0f;
-        target_x = std::clamp(target_x + static_cast<float>(lane_delta) * step, -LATERAL_BOUND, LATERAL_BOUND);
+        constexpr float lane_w = (TRACK_HALF_WIDTH * 2.0f) / 3.0f;
+        current_lane = std::clamp(current_lane + lane_delta, 0, 2);
+        target_x = static_cast<float>(current_lane - 1) * lane_w;
     }
 };
 
 // =============================================================================
-// TREADMILL SYSTEM (SEGMENTS, POWER-UPS, ORBS, COMBOS & MODES)
+// TREADMILL SYSTEM (SEGMENTS, POWER-UPS, HYPERFLOW FEVER, COMBOS & MODES)
 // =============================================================================
+
+struct FrameEvents {
+    bool near_miss_triggered{false};
+    bool fever_started{false};
+    bool biome_changed{false};
+    int  dodges_this_frame{0};
+    int  distance_delta_m{0};
+};
 
 class TreadmillSystem {
 public:
-    static constexpr size_t POOL_SIZE           = 8;
+    static constexpr size_t POOL_SIZE           = 10;
     static constexpr float  SEGMENT_SPACING     = 10.0f;
     static constexpr float  MIN_OBSTACLE_GAP    = 20.0f;
     static constexpr float  MOVING_SAFETY_GAP   = 30.0f;
     static constexpr float  DESPAWN_THRESHOLD_Z = -10.0f;
     static constexpr float  BASE_SPEED          = 18.0f;
     static constexpr float  HARDCORE_BASE_SPEED = 28.0f;
-    static constexpr float  SPEED_ACCELERATION  = 0.55f;
-    static constexpr float  MAX_SPEED           = 55.0f;
+    static constexpr float  SPEED_ACCELERATION  = 0.52f;
+    static constexpr float  MAX_SPEED           = 58.0f;
     static constexpr float  TIME_ATTACK_START   = 90.0f;
+    static constexpr float  FEVER_DURATION      = 6.0f;
+    static constexpr float  BIOME_LENGTH        = 450.0f;
 
     static constexpr float LANE_WIDTH    = (PlayerBall::TRACK_HALF_WIDTH * 2.0f) / 3.0f;
     static constexpr float LEFT_LANE_X   = -LANE_WIDTH;
     static constexpr float CENTER_LANE_X = 0.0f;
     static constexpr float RIGHT_LANE_X  = LANE_WIDTH;
 
-    static constexpr float OBSTACLE_WIDTH  = LANE_WIDTH;
-    static constexpr float OBSTACLE_HEIGHT = LANE_WIDTH;
-    static constexpr float OBSTACLE_DEPTH  = LANE_WIDTH;
+    static constexpr float OBSTACLE_WIDTH  = LANE_WIDTH * 0.94f;
+    static constexpr float OBSTACLE_HEIGHT = LANE_WIDTH * 0.94f;
+    static constexpr float OBSTACLE_DEPTH  = LANE_WIDTH * 0.90f;
 
     static constexpr float MOVING_HALF_CYCLE_TIME = 1.10f;
     static constexpr float MOVING_WARNING_TIME    = 0.35f;
 
-    static constexpr float MOVING_DIFFICULTY_START_SPEED = 26.0f;
+    static constexpr float MOVING_DIFFICULTY_START_SPEED = 25.0f;
     static constexpr float MOVING_DIFFICULTY_END_SPEED   = 55.0f;
-    static constexpr float MOVING_MIN_SPAWN_PROBABILITY  = 0.40f;
-    static constexpr float MOVING_MAX_SPAWN_PROBABILITY  = 0.58f;
+    static constexpr float MOVING_MIN_SPAWN_PROBABILITY  = 0.36f;
+    static constexpr float MOVING_MAX_SPAWN_PROBABILITY  = 0.56f;
 
     TreadmillSystem()
         : rng_(std::random_device{}()),
@@ -418,10 +837,18 @@ public:
 
     [[nodiscard]] GameMode get_game_mode() const { return game_mode_; }
 
+    void apply_upgrades(const SaveData& save) {
+        shield_lv_    = save.get_upgrade_level(UpgradeType::SHIELD_CAP);
+        magnet_lv_    = save.get_upgrade_level(UpgradeType::MAGNET_COIL);
+        chrono_lv_    = save.get_upgrade_level(UpgradeType::CHRONO_CORE);
+        overdrive_lv_ = save.get_upgrade_level(UpgradeType::OVERDRIVE_THRUSTER);
+    }
+
     void reset() {
         base_speed_ = (game_mode_ == GameMode::HARDCORE) ? HARDCORE_BASE_SPEED : BASE_SPEED;
         global_speed_ = base_speed_;
         distance_traveled_ = 0.0f;
+        last_recorded_dist_m_ = 0;
         score_ = 0;
         bonus_score_ = 0;
         dodge_count_ = 0;
@@ -429,16 +856,22 @@ public:
         dodge_milestone_timer_ = 0.0f;
         has_new_best_ = false;
         red_pattern_index_ = 0;
+        last_biome_index_ = 0;
+        revive_used_ = false;
 
-        // Combo & collectibles
+        // Combo, Hyperflow Fever & collectibles
         combo_ = 1;
         best_run_combo_ = 1;
         dodge_streak_ = 0;
         near_miss_count_ = 0;
         run_orbs_ = 0;
+        fever_meter_ = 0.0f;
+        fever_active_ = false;
+        fever_timer_ = 0.0f;
+        run_fevers_ = 0;
 
-        // Power-up state
-        shield_active_ = false;
+        // Power-up state (Lv3+ Aegis Capacitor starts Arcade/Time Attack with a Shield!)
+        shield_active_ = (game_mode_ != GameMode::HARDCORE && shield_lv_ >= 3);
         active_powerup_ = PowerUpType::NONE;
         powerup_timer_ = 0.0f;
         powerup_duration_ = 1.0f;
@@ -458,6 +891,7 @@ public:
             segments_[i].obstacle_height = OBSTACLE_HEIGHT;
             segments_[i].obstacle_depth = OBSTACLE_DEPTH;
             segments_[i].obstacle_type = ObstacleType::STATIC_BLOCK;
+            segments_[i].has_second_obstacle = false;
             segments_[i].is_moving = false;
             segments_[i].motion_phase = 0.0f;
             segments_[i].motion_warning_time = 0.0f;
@@ -480,7 +914,7 @@ public:
         }
     }
 
-    void trigger_banner(const char* msg, float duration = 1.15f) {
+    void trigger_banner(const char* msg, float duration = 1.25f) {
         if (!msg) return;
         std::snprintf(banner_text_, sizeof(banner_text_), "%s", msg);
         banner_timer_ = duration;
@@ -489,25 +923,25 @@ public:
     void activate_powerup(PowerUpType type) {
         if (type == PowerUpType::SHIELD) {
             shield_active_ = true;
-            trigger_banner("SHIELD ACTIVE!", 1.2f);
+            trigger_banner("AEGIS SHIELD!", 1.2f);
             return;
         }
         active_powerup_ = type;
         switch (type) {
             case PowerUpType::OVERDRIVE:
-                powerup_duration_ = 5.0f;
-                powerup_timer_ = 5.0f;
-                trigger_banner("OVERDRIVE BOOST!", 1.2f);
+                powerup_duration_ = 5.0f + static_cast<float>(overdrive_lv_) * 0.7f;
+                powerup_timer_ = powerup_duration_;
+                trigger_banner("OVERDRIVE BOOST!", 1.25f);
                 break;
             case PowerUpType::SLOW_MO:
-                powerup_duration_ = 6.0f;
-                powerup_timer_ = 6.0f;
-                trigger_banner("CHRONO SLOW-MO!", 1.2f);
+                powerup_duration_ = 6.0f + static_cast<float>(chrono_lv_) * 0.8f;
+                powerup_timer_ = powerup_duration_;
+                trigger_banner("CHRONO SLOW-MO!", 1.25f);
                 break;
             case PowerUpType::MAGNET:
-                powerup_duration_ = 8.0f;
-                powerup_timer_ = 8.0f;
-                trigger_banner("ORB MAGNET!", 1.2f);
+                powerup_duration_ = 8.0f + static_cast<float>(magnet_lv_) * 1.0f;
+                powerup_timer_ = powerup_duration_;
+                trigger_banner("ORB MAGNET!", 1.25f);
                 break;
             default:
                 break;
@@ -517,22 +951,75 @@ public:
     bool consume_shield() {
         if (!shield_active_) return false;
         shield_active_ = false;
-        bonus_score_ += 300 * get_mode_multiplier();
-        trigger_banner("+300 SHIELD SMASH!", 1.3f);
+        int pts = (300 + shield_lv_ * 60) * get_effective_multiplier();
+        bonus_score_ += pts;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "+%d SHIELD SMASH!", pts);
+        trigger_banner(buf, 1.3f);
         return true;
+    }
+
+    float get_shield_invuln_duration() const {
+        return 1.2f + static_cast<float>(shield_lv_) * 0.2f;
+    }
+
+    void clear_nearby_for_revive() {
+        revive_used_ = true;
+        for (auto& seg : segments_) {
+            if (seg.z_position < 32.0f) {
+                seg.has_obstacle = false;
+                seg.has_second_obstacle = false;
+                seg.cleared = true;
+            }
+        }
+        trigger_banner("SECOND CHANCE!", 1.5f);
+    }
+
+    bool can_revive() const {
+        return !revive_used_ && !time_expired_;
     }
 
     void reset_combo() {
         combo_ = 1;
         dodge_streak_ = 0;
+        if (!fever_active_) {
+            fever_meter_ *= 0.5f;
+        }
     }
 
-    void update(float dt, const Vec3& player_pos = {0.0f, PlayerBall::RADIUS, 0.0f}) {
+    bool add_fever_charge(float amount) {
+        if (fever_active_) return false;
+        float mult = 1.0f + static_cast<float>(overdrive_lv_) * 0.12f;
+        fever_meter_ = std::min(1.0f, fever_meter_ + amount * mult);
+        if (fever_meter_ >= 1.0f) {
+            fever_active_ = true;
+            fever_timer_ = FEVER_DURATION;
+            ++run_fevers_;
+            trigger_banner("HYPERFLOW 2X!", 1.45f);
+            return true;
+        }
+        return false;
+    }
+
+    FrameEvents update(float dt, const Vec3& player_pos = {0.0f, PlayerBall::RADIUS, 0.0f}) {
+        FrameEvents ev{};
+
         orb_spin_angle_ += 3.2f * dt;
         if (orb_spin_angle_ > 2.0f * PI) orb_spin_angle_ -= 2.0f * PI;
 
         if (banner_timer_ > 0.0f) {
             banner_timer_ = std::max(0.0f, banner_timer_ - dt);
+        }
+
+        // Hyperflow / Fever countdown
+        if (fever_active_) {
+            fever_timer_ -= dt;
+            fever_meter_ = std::clamp(fever_timer_ / FEVER_DURATION, 0.0f, 1.0f);
+            if (fever_timer_ <= 0.0f) {
+                fever_active_ = false;
+                fever_timer_ = 0.0f;
+                fever_meter_ = 0.0f;
+            }
         }
 
         // Power-up countdown
@@ -555,19 +1042,39 @@ public:
         float accel = (game_mode_ == GameMode::HARDCORE) ? (SPEED_ACCELERATION * 1.35f) : SPEED_ACCELERATION;
         base_speed_ = std::min(MAX_SPEED, base_speed_ + accel * dt);
 
-        // Effective speed accounts for Overdrive (1.35x) or Slow-Mo (0.65x)
+        // Effective speed accounts for Overdrive (1.35x), Hyperflow (1.12x), or Slow-Mo (0.68x)
         float speed_mod = 1.0f;
         if (active_powerup_ == PowerUpType::OVERDRIVE) {
             speed_mod = 1.35f;
         } else if (active_powerup_ == PowerUpType::SLOW_MO) {
             speed_mod = 0.68f;
+        } else if (fever_active_) {
+            speed_mod = 1.12f;
         }
         global_speed_ = std::clamp(base_speed_ * speed_mod, 12.0f, MAX_SPEED * 1.25f);
 
         const float z_disp = global_speed_ * dt;
         distance_traveled_ += z_disp;
 
-        const int mode_mult = get_mode_multiplier();
+        int cur_dist_m = static_cast<int>(distance_traveled_);
+        if (cur_dist_m > last_recorded_dist_m_) {
+            ev.distance_delta_m = cur_dist_m - last_recorded_dist_m_;
+            last_recorded_dist_m_ = cur_dist_m;
+        }
+
+        // Detect biome transition
+        size_t cur_biome = get_biome_index();
+        if (cur_biome != last_biome_index_) {
+            last_biome_index_ = cur_biome;
+            ev.biome_changed = true;
+            char bbuf[32];
+            std::snprintf(bbuf, sizeof(bbuf), "SECTOR: %s", BIOME_PALETTES[cur_biome].name);
+            trigger_banner(bbuf, 1.5f);
+        }
+
+        const int eff_mult = get_effective_multiplier();
+        const float magnet_range = 16.0f + static_cast<float>(magnet_lv_) * 2.5f;
+        const float magnet_pull  = 28.0f + static_cast<float>(magnet_lv_) * 3.0f;
 
         for (auto& segment : segments_) {
             segment.z_position -= z_disp;
@@ -577,11 +1084,11 @@ public:
             // Magnet attraction pulls uncollected orbs directly toward player
             if (segment.has_orb && !segment.orb_collected &&
                 active_powerup_ == PowerUpType::MAGNET &&
-                segment.z_position > -2.0f && segment.z_position < 16.0f) {
+                segment.z_position > -2.0f && segment.z_position < magnet_range) {
                 Vec3 dir = (player_pos - segment.orb_pos);
                 float dist = dir.length();
                 if (dist > 0.05f) {
-                    segment.orb_pos += (dir / dist) * (28.0f * dt);
+                    segment.orb_pos += (dir / dist) * (magnet_pull * dt);
                 }
             }
 
@@ -589,6 +1096,7 @@ public:
                 segment.cleared = true;
                 ++dodge_count_;
                 ++dodge_streak_;
+                ++ev.dodges_this_frame;
 
                 // Update combo every 3 clean dodges (up to 5x)
                 combo_ = std::min(5, 1 + (dodge_streak_ / 3));
@@ -596,23 +1104,38 @@ public:
 
                 // Check for near-miss bonus (close lateral pass or jumping cleanly over a low barrier)
                 float lat_dist = std::fabs(player_pos.x - segment.obstacle_x_offset);
+                if (segment.has_second_obstacle) {
+                    lat_dist = std::min(lat_dist, std::fabs(player_pos.x - segment.second_obstacle_x));
+                }
+
                 bool jumped_over = (segment.obstacle_type == ObstacleType::LOW_BARRIER &&
                                     lat_dist < segment.obstacle_width * 0.65f &&
                                     player_pos.y > segment.obstacle_height);
-                bool close_shave = (lat_dist < (segment.obstacle_width * 0.5f + PlayerBall::RADIUS + 0.55f));
+                bool close_shave = (lat_dist < (segment.obstacle_width * 0.5f + PlayerBall::RADIUS + 0.58f));
 
                 if (jumped_over || close_shave) {
                     ++near_miss_count_;
-                    int nm_pts = 200 * combo_ * mode_mult;
+                    ev.near_miss_triggered = true;
+                    int nm_pts = 200 * combo_ * eff_mult;
                     bonus_score_ += nm_pts;
+                    if (fever_active_) {
+                        fever_timer_ = std::min(FEVER_DURATION, fever_timer_ + 0.6f);
+                    } else if (add_fever_charge(0.18f)) {
+                        ev.fever_started = true;
+                    }
                     if (game_mode_ == GameMode::TIME_ATTACK) {
                         time_remaining_ = std::min(99.0f, time_remaining_ + 1.5f);
                     }
-                    char buf[32];
-                    std::snprintf(buf, sizeof(buf), "NEAR MISS +%d!", nm_pts);
-                    trigger_banner(buf, 0.95f);
+                    if (!ev.fever_started) {
+                        char buf[32];
+                        std::snprintf(buf, sizeof(buf), "NEAR MISS +%d!", nm_pts);
+                        trigger_banner(buf, 0.95f);
+                    }
                 } else {
-                    bonus_score_ += 100 * combo_ * mode_mult;
+                    bonus_score_ += 100 * combo_ * eff_mult;
+                    if (add_fever_charge(0.06f)) {
+                        ev.fever_started = true;
+                    }
                     if (game_mode_ == GameMode::TIME_ATTACK) {
                         time_remaining_ = std::min(99.0f, time_remaining_ + 0.4f);
                     }
@@ -641,8 +1164,7 @@ public:
                 const float cycle = segment.motion_phase;
                 const float half_cycle = std::floor(cycle);
                 const float local_t = cycle - half_cycle;
-                const float eased_t =
-                    local_t * local_t * (3.0f - 2.0f * local_t);
+                const float eased_t = local_t * local_t * (3.0f - 2.0f * local_t);
 
                 TrackLane second_lane;
                 TrackLane third_lane;
@@ -666,18 +1188,19 @@ public:
                 const float third_x = lane_x(third_lane);
 
                 if (cycle < 1.0f) {
-                    segment.obstacle_x_offset =
-                        start_x + (second_x - start_x) * eased_t;
+                    segment.obstacle_x_offset = start_x + (second_x - start_x) * eased_t;
                 } else {
-                    segment.obstacle_x_offset =
-                        second_x + (third_x - second_x) * eased_t;
+                    segment.obstacle_x_offset = second_x + (third_x - second_x) * eased_t;
                 }
             }
         }
 
         float speed_ratio = (base_speed_ - BASE_SPEED) / (MAX_SPEED - BASE_SPEED);
         float speed_mult = 1.0f + std::clamp(speed_ratio, 0.0f, 1.0f) * 1.5f;
-        score_ = static_cast<int>(distance_traveled_ * 1.5f * speed_mult * static_cast<float>(mode_mult)) + bonus_score_;
+        float chrono_bonus = (active_powerup_ == PowerUpType::SLOW_MO)
+            ? (1.0f + static_cast<float>(chrono_lv_) * 0.10f) : 1.0f;
+        score_ = static_cast<int>(distance_traveled_ * 1.5f * speed_mult *
+                                  static_cast<float>(get_mode_multiplier()) * chrono_bonus) + bonus_score_;
 
         if (best_score_ > 0 && score_ > best_score_) {
             has_new_best_ = true;
@@ -700,24 +1223,29 @@ public:
                 setup_segment(segment);
             }
         }
+
+        return ev;
     }
 
-    void collect_orb(PathSegment& seg) {
-        if (!seg.has_orb || seg.orb_collected) return;
+    bool collect_orb(PathSegment& seg) {
+        if (!seg.has_orb || seg.orb_collected) return false;
         seg.orb_collected = true;
         int mult = get_mode_multiplier();
         run_orbs_ += mult;
-        bonus_score_ += 50 * combo_ * mult;
+        bonus_score_ += 50 * combo_ * get_effective_multiplier();
+        bool started_fever = add_fever_charge(0.05f);
         if (game_mode_ == GameMode::TIME_ATTACK) {
             time_remaining_ = std::min(99.0f, time_remaining_ + 1.5f);
         }
+        return started_fever;
     }
 
     void smash_obstacle(PathSegment& seg) {
         seg.has_obstacle = false;
+        seg.has_second_obstacle = false;
         seg.cleared = true;
         ++dodge_count_;
-        bonus_score_ += 200 * combo_ * get_mode_multiplier();
+        bonus_score_ += 200 * combo_ * get_effective_multiplier();
     }
 
     void apply_time_penalty(float seconds) {
@@ -733,8 +1261,36 @@ public:
         return (game_mode_ == GameMode::HARDCORE) ? 2 : 1;
     }
 
+    [[nodiscard]] int get_effective_multiplier() const {
+        return get_mode_multiplier() * (fever_active_ ? 2 : 1);
+    }
+
     [[nodiscard]] size_t get_biome_index() const {
-        return static_cast<size_t>(distance_traveled_ / 450.0f) % BIOME_PALETTES.size();
+        return static_cast<size_t>(distance_traveled_ / BIOME_LENGTH) % BIOME_PALETTES.size();
+    }
+
+    // Smoothly interpolated biome palette across the last 40m of each sector!
+    [[nodiscard]] BiomePalette get_interpolated_biome() const {
+        const float pos_in_biome = std::fmod(distance_traveled_, BIOME_LENGTH);
+        const size_t cur_idx = get_biome_index();
+        const size_t next_idx = (cur_idx + 1) % BIOME_PALETTES.size();
+        const float blend_zone = 45.0f;
+
+        if (pos_in_biome <= (BIOME_LENGTH - blend_zone)) {
+            return BIOME_PALETTES[cur_idx];
+        }
+        float t = smoothstep(BIOME_LENGTH - blend_zone, BIOME_LENGTH, pos_in_biome);
+        const auto& a = BIOME_PALETTES[cur_idx];
+        const auto& b = BIOME_PALETTES[next_idx];
+        return {
+            (t < 0.5f) ? a.name : b.name,
+            Color3::lerp(a.floor_base, b.floor_base, t),
+            Color3::lerp(a.grid_color, b.grid_color, t),
+            Color3::lerp(a.rail_color, b.rail_color, t),
+            Color3::lerp(a.sky_fog,    b.sky_fog,    t),
+            Color3::lerp(a.sun_top,    b.sun_top,    t),
+            Color3::lerp(a.sun_bottom, b.sun_bottom, t)
+        };
     }
 
     [[nodiscard]] const std::array<PathSegment, POOL_SIZE>& get_segments() const { return segments_; }
@@ -752,6 +1308,9 @@ public:
     [[nodiscard]] int   get_near_miss_count() const { return near_miss_count_; }
     [[nodiscard]] int   get_run_orbs() const { return run_orbs_; }
     [[nodiscard]] bool  is_shield_active() const { return shield_active_; }
+    [[nodiscard]] bool  is_fever_active() const { return fever_active_; }
+    [[nodiscard]] float get_fever_meter() const { return fever_meter_; }
+    [[nodiscard]] int   get_run_fevers() const { return run_fevers_; }
     [[nodiscard]] PowerUpType get_active_powerup() const { return active_powerup_; }
     [[nodiscard]] float get_powerup_timer() const { return powerup_timer_; }
     [[nodiscard]] float get_powerup_progress() const {
@@ -776,14 +1335,16 @@ public:
 
 private:
     static TrackLane red_pattern_lane(size_t index) {
-        static constexpr std::array<TrackLane, 8> RED_PATTERN = {{
+        static constexpr std::array<TrackLane, 10> RED_PATTERN = {{
+            TrackLane::LEFT,
+            TrackLane::CENTER,
+            TrackLane::RIGHT,
             TrackLane::LEFT,
             TrackLane::CENTER,
             TrackLane::RIGHT,
             TrackLane::CENTER,
-            TrackLane::RIGHT,
-            TrackLane::CENTER,
             TrackLane::LEFT,
+            TrackLane::RIGHT,
             TrackLane::CENTER
         }};
         return RED_PATTERN[index % RED_PATTERN.size()];
@@ -799,6 +1360,7 @@ private:
         seg.obstacle_height = OBSTACLE_HEIGHT;
         seg.obstacle_depth = OBSTACLE_DEPTH;
         seg.obstacle_type = ObstacleType::STATIC_BLOCK;
+        seg.has_second_obstacle = false;
         seg.has_orb = false;
         seg.orb_collected = false;
         seg.powerup_type = PowerUpType::NONE;
@@ -814,7 +1376,7 @@ private:
             }
         }
 
-        seg.has_obstacle = !obstacle_too_close && (dist_prob_(rng_) > 0.28f);
+        seg.has_obstacle = !obstacle_too_close && (dist_prob_(rng_) > 0.26f);
 
         if (!seg.has_obstacle) {
             seg.lane = TrackLane::CENTER;
@@ -824,20 +1386,20 @@ private:
 
             // Spawn collectible orb or occasional power-up on open segments
             float roll = dist_prob_(rng_);
-            if (roll < 0.55f) {
+            if (roll < 0.60f) {
                 int orb_l = static_cast<int>(dist_prob_(rng_) * 3.0f);
                 seg.orb_lane = static_cast<TrackLane>(std::min(2, orb_l));
                 seg.has_orb = true;
                 seg.orb_pos = {lane_x(seg.orb_lane), 0.85f, seg.z_position};
-            } else if (roll < 0.68f && distance_traveled_ > 80.0f) {
+            } else if (roll < 0.74f && distance_traveled_ > 70.0f) {
                 int pu_l = static_cast<int>(dist_prob_(rng_) * 3.0f);
                 seg.powerup_lane = static_cast<TrackLane>(std::min(2, pu_l));
                 float p_roll = dist_prob_(rng_);
-                if (game_mode_ != GameMode::HARDCORE && p_roll < 0.30f && !shield_active_) {
+                if (game_mode_ != GameMode::HARDCORE && p_roll < 0.28f && !shield_active_) {
                     seg.powerup_type = PowerUpType::SHIELD;
-                } else if (p_roll < 0.55f) {
+                } else if (p_roll < 0.54f) {
                     seg.powerup_type = PowerUpType::MAGNET;
-                } else if (p_roll < 0.80f) {
+                } else if (p_roll < 0.78f) {
                     seg.powerup_type = PowerUpType::SLOW_MO;
                 } else {
                     seg.powerup_type = PowerUpType::OVERDRIVE;
@@ -897,30 +1459,42 @@ private:
             seg.motion_target_lane = seg.lane;
             seg.obstacle_x_offset = lane_x(seg.lane);
 
-            // Introduce Low Laser Barriers (jumpable) and Overhead Gates (roll under)
             float type_roll = dist_prob_(rng_);
-            if (distance_traveled_ > 60.0f && type_roll < 0.26f) {
+            if (distance_traveled_ > 50.0f && type_roll < 0.28f) {
                 seg.obstacle_type = ObstacleType::LOW_BARRIER;
                 seg.obstacle_height = 0.72f;
                 seg.obstacle_depth = 0.70f;
                 seg.hover_y = 0.0f;
-                // Place an incentive Data Orb directly above the low barrier for jump mastery!
+                // Incentive Data Orb directly above the low barrier for jump mastery
                 seg.has_orb = true;
                 seg.orb_lane = seg.lane;
                 seg.orb_pos = {seg.obstacle_x_offset, 1.95f, seg.z_position};
-            } else if (distance_traveled_ > 140.0f && type_roll < 0.44f) {
+            } else if (distance_traveled_ > 120.0f && type_roll < 0.46f) {
                 seg.obstacle_type = ObstacleType::OVERHEAD_GATE;
                 seg.obstacle_height = 1.15f;
                 seg.obstacle_depth = 0.85f;
-                seg.hover_y = 1.52f; // Bottom of gate is at y = 1.52f, safe for grounded ball (top = 1.40f)
-                // Place an orb underneath the overhead gate
+                seg.hover_y = 1.52f;
                 seg.has_orb = true;
                 seg.orb_lane = seg.lane;
                 seg.orb_pos = {seg.obstacle_x_offset, 0.75f, seg.z_position};
             } else {
                 seg.obstacle_type = ObstacleType::STATIC_BLOCK;
-                // Occasionally spawn an orb in an adjacent safe lane
-                if (dist_prob_(rng_) < 0.48f) {
+
+                // Dual-Lane Wall formation at higher speeds (always leaves 1 safe lane!)
+                float dual_chance = 0.16f + 0.24f * difficulty_t;
+                if (distance_traveled_ > 160.0f && dist_prob_(rng_) < dual_chance) {
+                    int l1 = static_cast<int>(seg.lane);
+                    int l2 = (l1 + ((dist_prob_(rng_) < 0.5f) ? 1 : 2)) % 3;
+                    int safe_l = 3 - l1 - l2;
+                    seg.has_second_obstacle = true;
+                    seg.second_lane = static_cast<TrackLane>(l2);
+                    seg.second_obstacle_x = lane_x(seg.second_lane);
+
+                    // Place reward orb in the single guaranteed safe lane
+                    seg.has_orb = true;
+                    seg.orb_lane = static_cast<TrackLane>(safe_l);
+                    seg.orb_pos = {lane_x(seg.orb_lane), 0.85f, seg.z_position};
+                } else if (dist_prob_(rng_) < 0.52f) {
                     TrackLane safe_lane = (seg.lane == TrackLane::CENTER)
                         ? ((dist_prob_(rng_) < 0.5f) ? TrackLane::LEFT : TrackLane::RIGHT)
                         : TrackLane::CENTER;
@@ -937,6 +1511,7 @@ private:
     float       base_speed_{BASE_SPEED};
     float       global_speed_{BASE_SPEED};
     float       distance_traveled_{0.0f};
+    int         last_recorded_dist_m_{0};
     int         score_{0};
     int         bonus_score_{0};
     int         best_score_{0};
@@ -944,6 +1519,8 @@ private:
     int         dodge_milestone_{0};
     float       dodge_milestone_timer_{0.0f};
     bool        has_new_best_{false};
+    size_t      last_biome_index_{0};
+    bool        revive_used_{false};
 
     int         combo_{1};
     int         best_run_combo_{1};
@@ -951,11 +1528,22 @@ private:
     int         near_miss_count_{0};
     int         run_orbs_{0};
 
+    float       fever_meter_{0.0f};
+    bool        fever_active_{false};
+    float       fever_timer_{0.0f};
+    int         run_fevers_{0};
+
     bool        shield_active_{false};
     PowerUpType active_powerup_{PowerUpType::NONE};
     float       powerup_timer_{0.0f};
     float       powerup_duration_{1.0f};
     float       orb_spin_angle_{0.0f};
+
+    // Upgrade levels synced from SaveData
+    int         shield_lv_{0};
+    int         magnet_lv_{0};
+    int         chrono_lv_{0};
+    int         overdrive_lv_{0};
 
     float       time_remaining_{TIME_ATTACK_START};
     bool        time_expired_{false};
@@ -974,6 +1562,7 @@ private:
 
 struct InteractionOutcome {
     bool orb_picked_up{false};
+    bool fever_started{false};
     bool powerup_picked_up{false};
     bool obstacle_smashed{false};
     bool shield_broken{false};
@@ -983,15 +1572,16 @@ struct InteractionOutcome {
 
 class CollisionSystem {
 public:
-    static bool check_obstacle_aabb(const Vec3& center, float radius, const PathSegment& seg) {
-        if (!seg.has_obstacle) return false;
-        if (seg.z_position < -3.0f || seg.z_position > 3.0f) return false;
+    static bool check_box_aabb(const Vec3& center, float radius,
+                               float box_x, float box_y_base, float box_z,
+                               float w, float h, float d) {
+        if (box_z < -3.0f || box_z > 3.0f) return false;
 
-        float hx = seg.obstacle_width * 0.5f;
-        float hy = seg.obstacle_height * 0.5f;
-        float hz = seg.obstacle_depth * 0.5f;
+        float hx = w * 0.5f;
+        float hy = h * 0.5f;
+        float hz = d * 0.5f;
 
-        Vec3 box_center = {seg.obstacle_x_offset, hy + seg.hover_y, seg.z_position};
+        Vec3 box_center = {box_x, hy + box_y_base, box_z};
 
         float cx = std::clamp(center.x, box_center.x - hx, box_center.x + hx);
         float cy = std::clamp(center.y, box_center.y - hy, box_center.y + hy);
@@ -1002,6 +1592,23 @@ public:
         float dz = center.z - cz;
 
         return (dx * dx + dy * dy + dz * dz) <= (radius * radius);
+    }
+
+    static bool check_obstacle_aabb(const Vec3& center, float radius, const PathSegment& seg) {
+        if (!seg.has_obstacle) return false;
+        if (check_box_aabb(center, radius,
+                           seg.obstacle_x_offset, seg.hover_y, seg.z_position,
+                           seg.obstacle_width, seg.obstacle_height, seg.obstacle_depth)) {
+            return true;
+        }
+        if (seg.has_second_obstacle) {
+            if (check_box_aabb(center, radius,
+                               seg.second_obstacle_x, seg.hover_y, seg.z_position,
+                               seg.obstacle_width, seg.obstacle_height, seg.obstacle_depth)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static bool check_collision(const PlayerBall& ball, const TreadmillSystem& treadmill) {
@@ -1025,9 +1632,11 @@ public:
             // 1. Check Data Orb pickup
             if (seg.has_orb && !seg.orb_collected) {
                 float dist_sq = Vec3::distance_sq(center, seg.orb_pos);
-                float pickup_r = radius + 0.65f;
+                float pickup_r = radius + 0.68f;
                 if (dist_sq <= pickup_r * pickup_r) {
-                    treadmill.collect_orb(seg);
+                    if (treadmill.collect_orb(seg)) {
+                        out.fever_started = true;
+                    }
                     out.orb_picked_up = true;
                 }
             }
@@ -1035,7 +1644,7 @@ public:
             // 2. Check Power-Up pickup
             if (seg.powerup_type != PowerUpType::NONE && !seg.powerup_collected) {
                 float dist_sq = Vec3::distance_sq(center, seg.powerup_pos);
-                float pickup_r = radius + 0.75f;
+                float pickup_r = radius + 0.78f;
                 if (dist_sq <= pickup_r * pickup_r) {
                     seg.powerup_collected = true;
                     treadmill.activate_powerup(seg.powerup_type);
@@ -1043,20 +1652,22 @@ public:
                 }
             }
 
-            // 3. Check Obstacle collision
+            // 3. Check Obstacle collision (primary or secondary lane blocker)
             if (seg.has_obstacle && check_obstacle_aabb(center, radius, seg)) {
-                out.impact_pos = {seg.obstacle_x_offset, seg.hover_y + seg.obstacle_height * 0.5f, seg.z_position};
+                out.impact_pos = {center.x, seg.hover_y + seg.obstacle_height * 0.5f, seg.z_position};
 
                 if (treadmill.get_active_powerup() == PowerUpType::OVERDRIVE) {
                     treadmill.smash_obstacle(seg);
                     out.obstacle_smashed = true;
                 } else if (treadmill.consume_shield()) {
                     seg.has_obstacle = false;
+                    seg.has_second_obstacle = false;
                     seg.cleared = true;
-                    ball.invulnerable_timer = 1.2f;
+                    ball.invulnerable_timer = treadmill.get_shield_invuln_duration();
                     out.shield_broken = true;
                 } else if (ball.invulnerable_timer > 0.0f) {
                     seg.has_obstacle = false;
+                    seg.has_second_obstacle = false;
                     seg.cleared = true;
                 } else {
                     out.lethal_collision = true;

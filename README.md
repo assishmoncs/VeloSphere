@@ -1,4 +1,4 @@
-# VeloSphere 2.0 — Production Edition
+# VeloSphere 3.0 — Hyperflow Edition
 
 [![Build Status](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml/badge.svg)](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml)
 [![Android](https://img.shields.io/badge/Platform-Android_24%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
@@ -9,90 +9,29 @@
 
 > A hardware-accelerated 3D synthwave endless runner built for Android using C++17, OpenGL ES 3.0, and Google's GameActivity library.
 
----
+## What's New in VeloSphere 3.0 (Hyperflow Edition)
 
-## Overview
+### Addictive Gameplay & Meta-Progression
+- **Hyperflow (Fever) Risk-Reward Gauge**: Chain dodges, Data Orbs, and **Near Misses** to fill the Hyperflow meter to 100% and unleash a 6-second **2x Score Multiplier** (stacking with 1x–5x combos up to **10x**!) with rainbow neon trails and near-miss duration extensions.
+- **Rotating Missions & Pilot Rank**: 3 active rotating challenges (Collect Orbs, Dodge Obstacles, Near Misses, Distance, Combos, Hyperflow triggers) that award Data Orbs mid-run and level up your Pilot Rank (`ROOKIE` → `PILOT` → `RACER` → `ACE` → `PHANTOM` → `LEGEND`).
+- **4 Permanent Tech Upgrades (Levels 0–5)**: Spend Data Orbs in the Garage to permanently upgrade **Aegis Capacitor** (Lv3+ starts runs with a Shield), **Magnet Coil**, **Chrono Core**, and **Hyper Thruster**.
+- **Second Chance Revive**: Spend 25 Data Orbs once per run on Game Over to clear nearby hazards with a shockwave and keep your high-score run alive.
+- **Dual-Lane Wall Formations & Crystal Pickups**: High-speed 2-lane hazard walls (always guaranteeing a fair safe lane) and faceted octahedron Data Orb & Power-Up crystals.
+- **Pro-Feel Controls**: Jump Input Buffering (`0.15s`), elastic landing squash-and-stretch, and selectable **Smooth Drag** or **Swipe-to-Lane** control schemes with Low/Med/High sensitivity.
 
-**VeloSphere 2.0** delivers a high-speed retro-futuristic synthwave arcade experience engineered directly on top of the Android NDK. Built without heavy third-party engines, VeloSphere uses a custom C++17 game loop, procedural 3D mesh pipelines, custom GLSL ES 3.0 shaders, and CRC32-verified persistence to achieve locked 60/120 FPS gameplay with zero garbage-collection pauses.
+### Zero-Lag OpenGL ES 3.0 Graphics Pipeline
+- **4 Specialized Shaders**: Split the legacy uber-shader into dedicated `SceneShader` (zero per-vertex `inverse()` matrix calls), 1-draw-call `SkyShader`, batched `ParticleShader`, and SDF Glassmorphic `UiShader`.
+- **1-Draw-Call Procedural Synthwave Horizon**: Animated striped Outrun sun, twilight gradient, scrolling neon mountain ridges, and twinkling starfield rendered in a single fullscreen quad with zero textures.
+- **Batched Rendering & Zero Per-Frame Allocations**: All particles (up to 160) render in **1 single draw call**; `HudRenderer` uses fixed pre-allocated vertex arrays with zero `std::vector` allocations per frame; `GL_CULL_FACE` enabled on closed 3D meshes.
+- **3D Neon Energy Trail Ribbon & Ground Contact Shadow**: Smooth 18-point glowing trail ribbon and height-reactive contact shadow for crisp jump depth perception.
+- **Smooth Biome Interpolation**: Seamless color blending across 450m sector transitions (`NEON GRID` → `SOLAR OUTRUN` → `CYBER MATRIX` → `VOID HORIZON`).
 
----
-
-## What's New in VeloSphere 2.0 (Production Release)
-
-- **3D Jump & Mid-Air Slam Physics**:
-  - Swipe **Up** to launch over low laser barriers and grab airborne Data Orbs.
-  - Swipe **Down** while airborne to execute a fast-drop slam for tight hazard recovery.
-- **4 Distinct Hazard Archetypes**:
-  - **Static Ruby Monoliths**: Full-lane barriers requiring rapid lateral weaving.
-  - **Amber Sweeper Hazards**: Dynamic lane-to-lane sweeping hazards with pre-sweep warning pulses.
-  - **Violet Low Laser Hurdles**: Low-profile barriers you can leap over for bonus airborne Data Orbs.
-  - **Crimson Overhead Gates**: Elevated gates supported by side pillars—stay grounded to roll safely underneath.
-- **4 Collectible Power-Ups**:
-  - **Aegis Shield**: Wraps the sphere in a Fresnel holographic energy shell that absorbs an impact and shatters the obstacle (`+300 SHIELD SMASH!`).
-  - **Overdrive Boost**: 5-second hyper-warp (+35% speed, wider FOV, auto-smashes obstacles in your path for `+200` points each).
-  - **Chrono Slow-Mo**: 6-second time dilation field that slows obstacle movement for surgical weaving.
-  - **Orb Magnet**: 8-second magnetic field that pulls Data Orbs from all three lanes directly into the sphere.
-- **Combo Multiplier, Near-Miss Alerts & Data Orbs**:
-  - Chain clean dodges to build your multiplier from **1x up to 5x**.
-  - Pass closely by obstacles or jump directly over low hurdles to trigger **`NEAR MISS!`** bonus popups.
-  - Collect spinning **Data Orbs** to unlock custom sphere skins.
-- **3 Selectable Game Modes**:
-  - **Endless Arcade**: Progressive acceleration with all power-ups and hazards.
-  - **Time Attack (90s)**: Race against the clock—collecting orbs, dodging obstacles, and scoring near-misses extend your timer.
-  - **Hardcore Mode**: Starts at high velocity (`28 u/s`), disables shields, and awards **2x Score and 2x Orbs**.
-- **5 Unlockable Sphere Skins & 4 Dynamic Synthwave Biomes**:
-  - Unlock and equip **Cyber Cyan**, **Solar Flare**, **Void Violet**, **Emerald Matrix**, and **Supernova Chrome**.
-  - Automatic biome transitions every 450m (**Neon Grid** → **Solar Outrun** → **Cyber Matrix** → **Void Horizon**) with real-time shader palette shifts.
-- **CRC32-Verified Binary Persistence (`velosphere_save.dat`)**:
-  - Versioned binary save format with `VELO` magic header, version tag, and CRC32 checksum verification (plus automatic migration from legacy `highscore.dat`).
-  - Persists per-mode high scores, total Data Orbs, unlocked skins, active skin/mode selections, and audio/haptic preferences.
-
----
-
-## Controls
-
-| Action | Touch Gesture | Description |
-| :--- | :--- | :--- |
-| **Launch / Retry** | **Tap Screen** | Starts the run or retries from Game Over |
-| **Steer Sphere** | **Swipe / Drag Left & Right** | Smoothly steers and banks the sphere across the 3 lanes |
-| **Jump** | **Swipe Up** | Jumps over Low Laser Hurdles and collects high Data Orbs |
-| **Fast-Drop Slam** | **Swipe Down (in air)** | Rapidly drops back to the runway surface |
-| **Pause / Menu** | **Tap Top-Center `II`** | Opens the interactive Pause overlay (Resume, Restart, Main Menu) |
-
----
-
-## Architecture & Project Structure
-
-```
-VeloSphere/
-├── app/
-│   ├── src/main/
-│   │   ├── cpp/
-│   │   │   ├── CMakeLists.txt        # Native build config linking GLESv3, EGL & GameActivity
-│   │   │   ├── GameLogic.h           # Core state, 3 modes, 4 hazard types, power-ups, combos & SaveData
-│   │   │   ├── Math3D.h              # 3D Vector, Color3 & Mat4 matrix math library
-│   │   │   ├── Mesh.h                # Procedural Sphere, Box, Track, Quad, Particles & 512-char HUD
-│   │   │   ├── Shader.h              # GLES 3.0 shaders with non-uniform normals, biomes & Fresnel shield
-│   │   │   └── main.cpp              # EGL context, android_main loop, gestures, menus & persistence
-│   │   ├── java/com/hsissa/velosphere/
-│   │   │   └── MainActivity.kt       # GameActivity wrapper with multi-SFX pitch SoundPool & haptics
-│   │   ├── res/                      # App resources, raw audio, icons, and themes
-│   │   └── AndroidManifest.xml       # Manifest specifying GLES 3.0 & touchscreen configuration
-│   ├── build.gradle.kts              # App module build config with R8 minification & NDK -O3 release flags
-│   └── proguard-rules.pro            # R8/ProGuard keep rules for GameActivity & JNI callbacks
-├── tests/
-│   └── GameLogicTest.cpp             # Standalone C++17 unit test suite for math, physics, collisions & saves
-├── .github/workflows/
-│   └── build.yml                     # CI workflow running C++17 unit tests + Debug/Release APK builds
-├── LICENSE                           # MIT License
-└── README.md                         # Project documentation
-```
-
----
+### Full Multi-Screen UI & Procedural Synthwave Audio
+- **7 Complete Screens**: **Home** (3D showcase), **Garage** (Live 3D turntable for 7 Skins + Tech Upgrades tab), **Missions & Career Stats**, **Settings** (Music, SFX, Haptics, Controls, Sensitivity, Graphics Quality Low/Med/High, FPS Counter), **In-Game HUD**, **Pause Overlay**, and **Run Summary / Revive**.
+- **12-Channel Procedural Synthwave SFX Bank**: Synthesizes distinct 16-bit PCM WAV sound effects at startup in `MainActivity.kt` for every arcade event (orbs, near-misses, Hyperflow chord, jump, slam, shield smash, UI taps, mission fanfare).
+- **CRC32 SaveData v3**: Automatic binary migration from v2 (`velosphere_save.dat`) and v1 (`highscore.dat`).
 
 ## Running the Native C++17 Unit Tests
-
-You can compile and run the core engine unit tests on any machine with a C++17 compiler (`g++` or `clang++`) without needing an Android device:
 
 ```bash
 g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
@@ -101,19 +40,11 @@ g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
 ./build_test_runner
 ```
 
----
-
 ## Building the Android APK
 
 ```bash
-# Build Debug and Release APKs
 ./gradlew assembleDebug assembleRelease
-
-# Install Debug APK on a connected Android device
-adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-
----
 
 ## License
 
