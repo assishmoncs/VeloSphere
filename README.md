@@ -1,4 +1,4 @@
-# VeloSphere 3.0 — Hyperflow Edition
+# VeloSphere 4.0 — Apex Edition
 
 [![Build Status](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml/badge.svg)](https://github.com/assishmoncs/VeloSphere/actions/workflows/build.yml)
 [![Android](https://img.shields.io/badge/Platform-Android_24%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com)
@@ -7,31 +7,28 @@
 [![GameActivity](https://img.shields.io/badge/Games_SDK-GameActivity_4.4.2-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developer.android.com/games/agdk/game-activity)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-> A hardware-accelerated 3D synthwave endless runner built for Android using C++17, OpenGL ES 3.0, and Google's GameActivity library.
+> A portrait-locked, hardware-accelerated 3D curved-world synthwave endless runner built for Android using C++17, OpenGL ES 3.0, and Google's GameActivity library.
 
-## What's New in VeloSphere 3.0 (Hyperflow Edition)
+## What's New in VeloSphere 4.0 — Apex Edition
 
-### Addictive Gameplay & Meta-Progression
-- **Hyperflow (Fever) Risk-Reward Gauge**: Chain dodges, Data Orbs, and **Near Misses** to fill the Hyperflow meter to 100% and unleash a 6-second **2x Score Multiplier** (stacking with 1x–5x combos up to **10x**!) with rainbow neon trails and near-miss duration extensions.
-- **Rotating Missions & Pilot Rank**: 3 active rotating challenges (Collect Orbs, Dodge Obstacles, Near Misses, Distance, Combos, Hyperflow triggers) that award Data Orbs mid-run and level up your Pilot Rank (`ROOKIE` → `PILOT` → `RACER` → `ACE` → `PHANTOM` → `LEGEND`).
-- **4 Permanent Tech Upgrades (Levels 0–5)**: Spend Data Orbs in the Garage to permanently upgrade **Aegis Capacitor** (Lv3+ starts runs with a Shield), **Magnet Coil**, **Chrono Core**, and **Hyper Thruster**.
-- **Second Chance Revive**: Spend 25 Data Orbs once per run on Game Over to clear nearby hazards with a shockwave and keep your high-score run alive.
-- **Dual-Lane Wall Formations & Crystal Pickups**: High-speed 2-lane hazard walls (always guaranteeing a fair safe lane) and faceted octahedron Data Orb & Power-Up crystals.
-- **Pro-Feel Controls**: Jump Input Buffering (`0.15s`), elastic landing squash-and-stretch, and selectable **Smooth Drag** or **Swipe-to-Lane** control schemes with Low/Med/High sensitivity.
+### Total Visual & 3D Animation Redesign
+- **Dynamic Curved World Horizon Shader**: Camera-relative vertex curvature bends the 8-slice cyber-highway, arches, hazards, trail ribbon, and particles smoothly left, right, and over the horizon (toggleable in Settings) with zero impact on deterministic collision physics.
+- **Articulated 3D Apex Gyro-Core Vessel**: Multi-part hierarchical 3D player rig with a metallic plasma core, two counter-rotating gyroscopic `TorusMesh` rings that bank into turns, smooth 360° jump flips, spring-damped fighter-jet camera roll, and expanding **3D Shockwave Rings** on jump, landing, near-miss, shield shatter, and Phase-Dash.
+- **Roadside 3D Cyber-Architecture**: Glowing neon overhead cyber-arches and floating rotating roadside energy pylons rush past to deliver intense 3D depth and speed.
+- **6 Articulated 3D Hazard Machines**: Cyber-Pillar Monoliths (collar ring + floating capstone crystal), Articulated Sweeper Drones (dual counter-spinning rotor rings), Twin-Emitter Low Laser Hurdles, Oscillating Hydraulic Overhead Gates, **Rotating Laser Spinners**, and animated **Split Gates** that slide open on approach.
+- **High-Res Smooth Anti-Aliased Vector Font**: Replaced blocky 5×7 pixel text with a procedurally rasterized `512×256` smooth SDF-like geometric font atlas (`GL_LINEAR` + crisp shader edge shaping).
 
-### Zero-Lag OpenGL ES 3.0 Graphics Pipeline
-- **4 Specialized Shaders**: Split the legacy uber-shader into dedicated `SceneShader` (zero per-vertex `inverse()` matrix calls), 1-draw-call `SkyShader`, batched `ParticleShader`, and SDF Glassmorphic `UiShader`.
-- **1-Draw-Call Procedural Synthwave Horizon**: Animated striped Outrun sun, twilight gradient, scrolling neon mountain ridges, and twinkling starfield rendered in a single fullscreen quad with zero textures.
-- **Batched Rendering & Zero Per-Frame Allocations**: All particles (up to 160) render in **1 single draw call**; `HudRenderer` uses fixed pre-allocated vertex arrays with zero `std::vector` allocations per frame; `GL_CULL_FACE` enabled on closed 3D meshes.
-- **3D Neon Energy Trail Ribbon & Ground Contact Shadow**: Smooth 18-point glowing trail ribbon and height-reactive contact shadow for crisp jump depth perception.
-- **Smooth Biome Interpolation**: Seamless color blending across 450m sector transitions (`NEON GRID` → `SOLAR OUTRUN` → `CYBER MATRIX` → `VOID HORIZON`).
+### Challenging Gameplay & Meta-Progression
+- **Double-Tap Warp Phase-Dash**: Active clutch ability with cooldown bar—double-tap to phase straight through hazards for `+150 PHASE DODGE!`, shockwave bursts, and cinematic micro-hitstop.
+- **Intensity Surge Waves**: Every 250m escalates obstacle density, speed, and hazard variety (Laser Spinners, Split Gates, Dual-Lane Walls).
+- **Hyperflow (Fever) 2x, Rotating Missions, 4 Tech Upgrades & Revive**: Stack up to **10x** multipliers, complete 3 rotating missions to rank up (`ROOKIE` → `LEGEND`), unlock 7 Skins & 4 Tech Upgrades (Lv 0–5), and use 25-Orb Second Chance Revives.
 
-### Full Multi-Screen UI & Procedural Synthwave Audio
-- **7 Complete Screens**: **Home** (3D showcase), **Garage** (Live 3D turntable for 7 Skins + Tech Upgrades tab), **Missions & Career Stats**, **Settings** (Music, SFX, Haptics, Controls, Sensitivity, Graphics Quality Low/Med/High, FPS Counter), **In-Game HUD**, **Pause Overlay**, and **Run Summary / Revive**.
-- **12-Channel Procedural Synthwave SFX Bank**: Synthesizes distinct 16-bit PCM WAV sound effects at startup in `MainActivity.kt` for every arcade event (orbs, near-misses, Hyperflow chord, jump, slam, shield smash, UI taps, mission fanfare).
-- **CRC32 SaveData v3**: Automatic binary migration from v2 (`velosphere_save.dat`) and v1 (`highscore.dat`).
+### Dedicated Portrait-Locked Screens & Audio
+- **9 Complete Screens**: **Home**, **Garage** (3D turntable Skins + Tech Upgrades), **Missions & Stats**, **Settings** (8 independent toggles including World Curve & Graphics Quality), **Help** (Controls, 6 Hazards & Pro Tips), **About** (Engine Specs, Credits & MIT License), **In-Game HUD**, **Pause**, and **Run Summary / Revive**.
+- **Strict Portrait Lock**: Enforced in both `AndroidManifest.xml` and `MainActivity.kt` (`SCREEN_ORIENTATION_PORTRAIT`).
+- **13-Channel Procedural Synthwave SFX Bank** + CRC32 `SaveData` v4 with automatic v2 migration.
 
-## Running the Native C++17 Unit Tests
+## Running Native C++17 Unit Tests
 
 ```bash
 g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
@@ -45,7 +42,3 @@ g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
 ```bash
 ./gradlew assembleDebug assembleRelease
 ```
-
-## License
-
-Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.

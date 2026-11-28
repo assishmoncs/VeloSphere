@@ -1,5 +1,6 @@
 package com.hsissa.velosphere
 
+import android.content.pm.ActivityInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.SoundPool
@@ -39,7 +40,6 @@ class MainActivity : GameActivity() {
     companion object {
         private var instance: MainActivity? = null
 
-        // SFX IDs synchronized with native C++ engine
         const val SFX_HIT          = 0
         const val SFX_ORB          = 1
         const val SFX_POWERUP      = 2
@@ -52,7 +52,8 @@ class MainActivity : GameActivity() {
         const val SFX_UNLOCK       = 9
         const val SFX_MISSION_DONE = 10
         const val SFX_COUNTDOWN    = 11
-        const val SFX_COUNT        = 12
+        const val SFX_PHASE_DASH   = 12
+        const val SFX_COUNT        = 13
 
         init {
             System.loadLibrary("native-lib")
@@ -81,6 +82,8 @@ class MainActivity : GameActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
+        // Enforce strict portrait orientation at runtime as well as in AndroidManifest
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onCreate(savedInstanceState)
         instance = this
         hideSystemUI()
@@ -107,13 +110,9 @@ class MainActivity : GameActivity() {
         runOnUiThread {
             try {
                 if (musicEnabled) {
-                    if (mediaPlayer?.isPlaying == false) {
-                        mediaPlayer?.start()
-                    }
+                    if (mediaPlayer?.isPlaying == false) mediaPlayer?.start()
                 } else {
-                    if (mediaPlayer?.isPlaying == true) {
-                        mediaPlayer?.pause()
-                    }
+                    if (mediaPlayer?.isPlaying == true) mediaPlayer?.pause()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -135,10 +134,6 @@ class MainActivity : GameActivity() {
             v.vibrate(durationMs.coerceAtLeast(1).toLong())
         }
     }
-
-    // =========================================================================
-    // PROCEDURAL SYNTHWAVE SFX BANK (16-BIT MONO PCM WAV -> SOUNDPOOL)
-    // =========================================================================
 
     private fun writeWavToCache(name: String, samples: ShortArray, sampleRate: Int = 22050): String {
         val file = File(cacheDir, name)
@@ -185,8 +180,7 @@ class MainActivity : GameActivity() {
             phase += 2.0 * PI * freq / sampleRate
             val env = exp(-t * 4.2) * (1.0 - exp(-t * 45.0))
             val wave = sin(phase) + harmonic * sin(phase * 2.0)
-            val v = (wave * env * volume * 32767.0).toInt().coerceIn(-32767, 32767)
-            out[i] = v.toShort()
+            out[i] = (wave * env * volume * 32767.0).toInt().coerceIn(-32767, 32767).toShort()
         }
         return out
     }
@@ -240,10 +234,7 @@ class MainActivity : GameActivity() {
                 }
             }
 
-            // Primary impact sound from raw asset
             sfxIds[SFX_HIT] = soundPool?.load(this, R.raw.ball_hit, 1) ?: 0
-
-            // Synthesize distinct futuristic synthwave SFX into cacheDir
             val pool = soundPool ?: return
             sfxIds[SFX_ORB]          = pool.load(writeWavToCache("sfx_orb.wav",       synthSweep(0.14, 720.0, 1480.0, 0.38, 0.30)), 1)
             sfxIds[SFX_POWERUP]      = pool.load(writeWavToCache("sfx_powerup.wav",   synthChord(0.32, doubleArrayOf(523.25, 659.25, 783.99, 1046.5), 0.48, 0.045)), 1)
@@ -256,6 +247,7 @@ class MainActivity : GameActivity() {
             sfxIds[SFX_UNLOCK]       = pool.load(writeWavToCache("sfx_unlock.wav",    synthChord(0.38, doubleArrayOf(587.33, 739.99, 880.0, 1174.66), 0.50, 0.06)), 1)
             sfxIds[SFX_MISSION_DONE] = pool.load(writeWavToCache("sfx_mission.wav",   synthChord(0.48, doubleArrayOf(523.25, 659.25, 783.99, 1046.5, 1318.5), 0.52, 0.06)), 1)
             sfxIds[SFX_COUNTDOWN]    = pool.load(writeWavToCache("sfx_countdown.wav", synthSweep(0.11, 660.0, 660.0, 0.35, 0.15)), 1)
+            sfxIds[SFX_PHASE_DASH]   = pool.load(writeWavToCache("sfx_dash.wav",      synthSweep(0.22, 1350.0, 280.0, 0.52, 0.45)), 1)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -278,9 +270,7 @@ class MainActivity : GameActivity() {
             mediaPlayer = MediaPlayer.create(this, R.raw.velosphere_bg)?.apply {
                 isLooping = true
                 setVolume(0.45f, 0.45f)
-                if (musicEnabled) {
-                    start()
-                }
+                if (musicEnabled) start()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -289,28 +279,21 @@ class MainActivity : GameActivity() {
 
     override fun onPause() {
         super.onPause()
-        if (mediaPlayer?.isPlaying == true) {
-            mediaPlayer?.pause()
-        }
+        if (mediaPlayer?.isPlaying == true) mediaPlayer?.pause()
     }
 
     override fun onResume() {
         super.onResume()
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         hideSystemUI()
-        if (musicEnabled && mediaPlayer?.isPlaying == false) {
-            mediaPlayer?.start()
-        }
+        if (musicEnabled && mediaPlayer?.isPlaying == false) mediaPlayer?.start()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            mediaPlayer?.stop()
-        } catch (_: Exception) {
-        }
+        try { mediaPlayer?.stop() } catch (_: Exception) {}
         mediaPlayer?.release()
         mediaPlayer = null
-
         soundPool?.release()
         soundPool = null
         sfxIds.fill(0)
@@ -321,14 +304,11 @@ class MainActivity : GameActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            hideSystemUI()
-        }
+        if (hasFocus) hideSystemUI()
     }
 
     private fun hideSystemUI() {
-        val windowInsetsController =
-            WindowCompat.getInsetsController(window, window.decorView)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())

@@ -18,7 +18,7 @@ namespace velo {
 #endif
 
 // =============================================================================
-// BASE SHADER COMPILER HELPER
+// SHADER COMPILER HELPERS
 // =============================================================================
 
 inline GLuint compile_gl_shader(GLenum type, const char* source) {
@@ -80,15 +80,16 @@ inline GLuint link_gl_program(const char* vert_source, const char* frag_source) 
 }
 
 // =============================================================================
-// 1. 3D SCENE SHADER (ZERO GPU MATRIX INVERSE, FRESNEL RIM, NEON GRID)
+// 1. 3D CURVED-WORLD SCENE SHADER (ZERO GPU INVERSE, FRESNEL RIM, NEON GRID)
 // =============================================================================
 
 class SceneShader {
 public:
     GLuint program_id{0};
-    GLint loc_mvp{-1};
+    GLint loc_vp{-1};
     GLint loc_model{-1};
     GLint loc_inv_scale{-1};
+    GLint loc_curve{-1};
     GLint loc_color{-1};
     GLint loc_energy_color{-1};
     GLint loc_sky_color{-1};
@@ -104,14 +105,17 @@ public:
         if (program_id) glUseProgram(program_id);
     }
 
-    void set_mvp(const Mat4& mat) const {
-        if (loc_mvp >= 0) glUniformMatrix4fv(loc_mvp, 1, GL_FALSE, mat.data());
+    void set_vp(const Mat4& vp) const {
+        if (loc_vp >= 0) glUniformMatrix4fv(loc_vp, 1, GL_FALSE, vp.data());
     }
     void set_model(const Mat4& mat) const {
         if (loc_model >= 0) glUniformMatrix4fv(loc_model, 1, GL_FALSE, mat.data());
     }
     void set_inv_scale(float ix, float iy, float iz) const {
         if (loc_inv_scale >= 0) glUniform3f(loc_inv_scale, ix, iy, iz);
+    }
+    void set_curve(float cx, float cy) const {
+        if (loc_curve >= 0) glUniform2f(loc_curve, cx, cy);
     }
     void set_color(float r, float g, float b, float a = 1.0f) const {
         if (loc_color >= 0) glUniform4f(loc_color, r, g, b, a);
@@ -188,13 +192,14 @@ public:
 };
 
 // =============================================================================
-// 3. BATCHED PARTICLE, TRAIL RIBBON & SHADOW SHADER (1 DRAW CALL EACH)
+// 3. CURVED-WORLD BATCHED PARTICLE, TRAIL RIBBON & SHADOW SHADER
 // =============================================================================
 
 class ParticleShader {
 public:
     GLuint program_id{0};
     GLint loc_vp{-1};
+    GLint loc_curve{-1};
     GLint loc_mode{-1}; // 0 = Radial Glow Particle, 1 = Trail Ribbon, 2 = Contact Shadow
 
     bool build();
@@ -204,6 +209,9 @@ public:
     }
     void set_vp(const Mat4& vp) const {
         if (loc_vp >= 0) glUniformMatrix4fv(loc_vp, 1, GL_FALSE, vp.data());
+    }
+    void set_curve(float cx, float cy) const {
+        if (loc_curve >= 0) glUniform2f(loc_curve, cx, cy);
     }
     void set_mode(int mode) const {
         if (loc_mode >= 0) glUniform1i(loc_mode, mode);
@@ -217,7 +225,7 @@ public:
 };
 
 // =============================================================================
-// 4. MODERN SDF GLASSMORPHIC UI & FONT SHADER
+// 4. MODERN SDF GLASSMORPHIC UI & ANTI-ALIASED VECTOR FONT SHADER
 // =============================================================================
 
 class UiShader {
@@ -230,7 +238,7 @@ public:
     GLint loc_rect_size{-1};
     GLint loc_radius{-1};
     GLint loc_border_width{-1};
-    GLint loc_mode{-1}; // 0 = Font Text, 1 = SDF Rounded Glass Panel, 2 = Fast Solid Quad
+    GLint loc_mode{-1}; // 0 = Anti-Aliased Vector Font, 1 = SDF Glass Panel, 2 = Solid Quad
     GLint loc_texture{-1};
 
     bool build();
@@ -278,9 +286,10 @@ layout(location = 0) in vec3 a_Position;
 layout(location = 1) in vec3 a_Normal;
 layout(location = 2) in vec2 a_TexCoord;
 
-uniform mat4 u_MVP;
+uniform mat4 u_VP;
 uniform mat4 u_Model;
 uniform vec3 u_InvScale;
+uniform vec2 u_Curve;
 
 out vec3 v_FragPos;
 out vec3 v_Normal;
@@ -288,11 +297,16 @@ out vec2 v_TexCoord;
 
 void main() {
     vec4 worldPos = u_Model * vec4(a_Position, 1.0);
+    // Camera-relative Curved World Horizon deformation (zero impact on physics!)
+    float dz = max(0.0, worldPos.z);
+    float dz2 = dz * dz;
+    worldPos.x += u_Curve.x * dz2;
+    worldPos.y += u_Curve.y * dz2;
+
     v_FragPos = worldPos.xyz;
-    // Fast exact normal transform without per-vertex matrix inverse()
     v_Normal = normalize(mat3(u_Model) * (a_Normal * u_InvScale));
     v_TexCoord = a_TexCoord;
-    gl_Position = u_MVP * vec4(a_Position, 1.0);
+    gl_Position = u_VP * worldPos;
 }
 )";
 
@@ -311,8 +325,8 @@ uniform vec3  u_ViewPos;
 uniform float u_Emission;
 uniform float u_Time;
 uniform int   u_ShadingMode;
-// 0 = Lit Rail/Prop, 1 = Neon Grid Runway, 2 = Glowing Hazard/Crystal,
-// 3 = Player Sphere, 4 = Fresnel Holographic Shield
+// 0 = Lit Rail/Arch/Prop, 1 = Neon Grid Runway, 2 = Glowing Hazard/Crystal,
+// 3 = Player Core Sphere, 4 = Fresnel Holographic Shield/Ring
 
 out vec4 fragColor;
 
@@ -323,33 +337,33 @@ void main() {
     float ndotv = max(dot(norm, viewDir), 0.0);
 
     if (u_ShadingMode == 4) {
-        // --- FRESNEL HOLOGRAPHIC SHIELD / OVERDRIVE SHELL ---
-        float fresnel = pow(1.0 - ndotv, 2.1);
-        float scan = 0.68 + 0.32 * sin(v_TexCoord.y * 42.0 - u_Time * 8.0);
-        float alpha = clamp((0.16 + fresnel * 0.78) * scan * u_Color.a, 0.0, 0.95);
-        vec3 col = u_Color.rgb * (1.0 + fresnel * u_Emission);
+        // --- FRESNEL HOLOGRAPHIC SHIELD / SHOCKWAVE RING ---
+        float fresnel = pow(1.0 - ndotv, 1.9);
+        float scan = 0.72 + 0.28 * sin(v_TexCoord.y * 40.0 - u_Time * 9.0);
+        float alpha = clamp((0.20 + fresnel * 0.76) * scan * u_Color.a, 0.0, 0.96);
+        vec3 col = u_Color.rgb * (1.05 + fresnel * u_Emission);
         fragColor = vec4(col, alpha);
         return;
     }
 
     if (u_ShadingMode == 1) {
-        // --- ANTI-ALIASED SYNTHWAVE RUNWAY GRID ---
+        // --- ANTI-ALIASED SYNTHWAVE RUNWAY GRID WITH SPEED PULSE ---
         vec2 uv = v_TexCoord;
         float gx = abs(fract(uv.x * 3.0 - 0.5) - 0.5) / max(fwidth(uv.x * 3.0), 0.001);
         float gz = abs(fract(uv.y * 2.0 - 0.5) - 0.5) / max(fwidth(uv.y * 2.0), 0.001);
         float grid = max(1.0 - min(gx, 1.0), 1.0 - min(gz, 1.0));
 
         float centerDist = abs(uv.x - 0.5);
-        float centerGlow = smoothstep(0.035, 0.0, centerDist);
+        float centerGlow = smoothstep(0.032, 0.0, centerDist);
         float edgeGlow = smoothstep(0.41, 0.50, centerDist);
-        float pulse = 0.88 + 0.12 * sin(u_Time * 3.5 + v_FragPos.z * 0.15);
+        float wave = 0.86 + 0.14 * sin(u_Time * 4.5 - v_FragPos.z * 0.22);
 
         vec3 track = u_Color.rgb
-                   + u_EnergyColor * grid * 0.55 * pulse
-                   + vec3(1.0, 0.32, 0.86) * centerGlow * 0.75
-                   + u_EnergyColor * edgeGlow * 1.20;
+                   + u_EnergyColor * grid * 0.62 * wave
+                   + vec3(1.0, 0.30, 0.88) * centerGlow * 0.82
+                   + u_EnergyColor * edgeGlow * 1.30;
 
-        float fogFactor = clamp((v_FragPos.z - 8.0) / 88.0, 0.0, 1.0);
+        float fogFactor = clamp((v_FragPos.z - 10.0) / 96.0, 0.0, 1.0);
         fogFactor = fogFactor * fogFactor;
         fragColor = vec4(mix(track, u_SkyColor, fogFactor), 1.0);
         return;
@@ -357,44 +371,46 @@ void main() {
 
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(norm, halfDir), 0.0), 40.0);
-    float fresnel = pow(1.0 - ndotv, 2.5);
+    float spec = pow(max(dot(norm, halfDir), 0.0), 44.0);
+    float fresnel = pow(1.0 - ndotv, 2.3);
 
     if (u_ShadingMode == 2) {
-        // --- NEON HAZARD OBSTACLE & CRYSTAL PICKUP ---
+        // --- ARTICULATED NEON HAZARD & CRYSTAL PICKUP ---
         float edgeX = min(v_TexCoord.x, 1.0 - v_TexCoord.x);
         float edgeY = min(v_TexCoord.y, 1.0 - v_TexCoord.y);
-        float edgeRim = smoothstep(0.09, 0.0, min(edgeX, edgeY)) * 0.55;
+        float edgeRim = smoothstep(0.10, 0.0, min(edgeX, edgeY)) * 0.62;
 
         vec3 base = u_Color.rgb * (0.34 + diff * 0.78);
-        vec3 specCol = vec3(1.0, 0.94, 0.90) * spec * 0.75;
-        vec3 glow = u_Color.rgb * (u_Emission + edgeRim + fresnel * 0.45);
+        vec3 specCol = vec3(1.0, 0.96, 0.92) * spec * 0.85;
+        vec3 glow = u_Color.rgb * (u_Emission + edgeRim + fresnel * 0.55);
         vec3 res = base + specCol + glow;
 
-        float fogFactor = clamp((v_FragPos.z - 8.0) / 92.0, 0.0, 1.0);
+        float fogFactor = clamp((v_FragPos.z - 10.0) / 98.0, 0.0, 1.0);
         fogFactor = fogFactor * fogFactor;
         fragColor = vec4(mix(res, u_SkyColor, fogFactor), u_Color.a);
         return;
     }
 
     if (u_ShadingMode == 3) {
-        // --- HIGH-TECH METALLIC PLAYER SPHERE WITH ENERGY BANDS ---
+        // --- METALLIC APEX GYRO-CORE SPHERE ---
         float latBand = smoothstep(0.18, 0.0, abs(fract(v_TexCoord.y * 6.0) - 0.5) * 2.0);
         float eqBand  = smoothstep(0.065, 0.0, abs(v_TexCoord.y - 0.5));
         float lonBand = smoothstep(0.15, 0.0, abs(fract(v_TexCoord.x * 8.0) - 0.5) * 2.0);
 
-        float pattern = max(eqBand * 1.45, max(latBand * 0.85, lonBand * 0.65));
+        float pattern = max(eqBand * 1.50, max(latBand * 0.85, lonBand * 0.65));
         vec3 surface = mix(u_Color.rgb, u_EnergyColor, clamp(pattern, 0.0, 1.0));
 
-        vec3 lit = surface * (0.38 + diff * 0.85) + vec3(1.0) * spec * 0.95;
-        vec3 rim = u_EnergyColor * (fresnel * 0.65 + u_Emission + pattern * 1.15);
+        vec3 lit = surface * (0.38 + diff * 0.88) + vec3(1.0) * spec * 1.05;
+        vec3 rim = u_EnergyColor * (fresnel * 0.85 + u_Emission + pattern * 1.25);
         fragColor = vec4(lit + rim, u_Color.a);
         return;
     }
 
-    // --- MODE 0: LIT RAILS & PROPS ---
-    vec3 res = u_Color.rgb * (0.32 + diff * 0.78 + u_Emission) + vec3(1.0) * spec * 0.65;
-    float fogFactor = clamp((v_FragPos.z - 8.0) / 92.0, 0.0, 1.0);
+    // --- MODE 0: LIT ARCHES, RAILS & PROPS ---
+    vec3 res = u_Color.rgb * (0.34 + diff * 0.80 + u_Emission)
+             + vec3(1.0) * spec * 0.75
+             + u_Color.rgb * fresnel * 0.45;
+    float fogFactor = clamp((v_FragPos.z - 10.0) / 98.0, 0.0, 1.0);
     fogFactor = fogFactor * fogFactor;
     fragColor = vec4(mix(res, u_SkyColor, fogFactor), u_Color.a);
 }
@@ -435,65 +451,57 @@ float hash21(vec2 p) {
 }
 
 void main() {
-    // Flip Y so uv.y = 0 is bottom, 1 is top
     vec2 uv = vec2(v_UV.x, 1.0 - v_UV.y);
     float horizon = 0.44;
 
-    // 1. Rich Synthwave Twilight Sky Gradient
-    vec3 zenith = u_SkyFog * 0.35 + vec3(0.01, 0.005, 0.035);
-    vec3 midSky = mix(u_SkyFog * 1.35, u_SunBottom * 0.38, 0.45);
+    vec3 zenith = u_SkyFog * 0.30 + vec3(0.01, 0.004, 0.04);
+    vec3 midSky = mix(u_SkyFog * 1.40, u_SunBottom * 0.42, 0.48);
     float skyT = clamp((uv.y - horizon) / (1.0 - horizon), 0.0, 1.0);
-    vec3 col = mix(midSky, zenith, pow(skyT, 0.65));
+    vec3 col = mix(midSky, zenith, pow(skyT, 0.62));
 
-    // Horizon atmospheric glow band
-    float hGlow = exp(-abs(uv.y - horizon) * 14.0);
-    col += mix(u_SunBottom, u_GridColor, 0.35) * hGlow * (0.55 + 0.35 * u_Fever);
+    float hGlow = exp(-abs(uv.y - horizon) * 13.0);
+    col += mix(u_SunBottom, u_GridColor, 0.35) * hGlow * (0.60 + 0.40 * u_Fever);
 
-    // 2. Retro Striped Synthwave Sun (medium & high quality)
     if (u_Quality >= 1 && uv.y > horizon - 0.02) {
-        vec2 sunCenter = vec2(0.5 - u_ParallaxX * 0.02, horizon + 0.145);
+        vec2 sunCenter = vec2(0.5 - u_ParallaxX * 0.02, horizon + 0.155);
         vec2 d = uv - sunCenter;
-        d.x *= 0.62; // Aspect correction for portrait phones
+        d.x *= 0.60;
         float r = length(d);
-        float sunR = 0.145;
+        float sunR = 0.155;
 
-        // Soft outer sun halo
-        col += u_SunBottom * exp(-r * 6.5) * 0.42;
+        col += u_SunBottom * exp(-r * 6.0) * 0.46;
 
         if (r < sunR) {
             float sunGrad = clamp((uv.y - (sunCenter.y - sunR)) / (2.0 * sunR), 0.0, 1.0);
             vec3 sunCol = mix(u_SunBottom, u_SunTop, sunGrad);
 
-            // Classic horizontal outrun scanline slices in lower half of sun
             float slice = 1.0;
             if (sunGrad < 0.58) {
-                float stripe = fract(sunGrad * 14.0 - u_Time * 0.25);
+                float stripe = fract(sunGrad * 14.0 - u_Time * 0.28);
                 float gap = mix(0.42, 0.05, sunGrad / 0.58);
                 slice = smoothstep(gap, gap + 0.06, stripe);
             }
             float edgeAA = smoothstep(sunR, sunR - 0.004, r);
-            col = mix(col, sunCol * 1.25, edgeAA * slice);
+            col = mix(col, sunCol * 1.28, edgeAA * slice);
         }
     }
 
-    // 3. Procedural Distant Mountain Silhouettes (high quality)
-    if (u_Quality >= 1 && uv.y > horizon - 0.02 && uv.y < horizon + 0.20) {
+    if (u_Quality >= 1 && uv.y > horizon - 0.02 && uv.y < horizon + 0.22) {
         float x = uv.x * 6.5 + u_ParallaxX * 0.08;
-        float ridge = 0.045 * abs(sin(x * 1.3 + 0.4)) + 0.028 * abs(sin(x * 2.9 - 1.1));
+        float ridge = 0.048 * abs(sin(x * 1.3 + 0.4)) + 0.030 * abs(sin(x * 2.9 - 1.1));
         float mH = horizon + ridge;
         if (uv.y < mH) {
             float rimDist = mH - uv.y;
-            vec3 mtnCol = u_SkyFog * 0.55;
-            float neonRim = smoothstep(0.008, 0.0, rimDist);
-            col = mtnCol + u_GridColor * neonRim * 0.85;
+            vec3 mtnCol = u_SkyFog * 0.52;
+            float neonRim = smoothstep(0.009, 0.0, rimDist);
+            col = mtnCol + u_GridColor * neonRim * 0.92;
         }
     }
 
-    // 4. Twinkling Starfield in upper sky (high quality)
     if (u_Quality >= 2 && uv.y > horizon + 0.12) {
         vec2 starCell = floor(uv * vec2(38.0, 64.0));
         float rnd = hash21(starCell);
-        if (rnd > 0.968) {
+        if (rnd > 0.966) {
             vec2 local = fract(uv * vec2(38.0, 64.0)) - 0.5;
             float d = length(local);
             float twinkle = 0.55 + 0.45 * sin(u_Time * (2.5 + rnd * 4.0) + rnd * 60.0);
@@ -502,7 +510,6 @@ void main() {
         }
     }
 
-    // Below horizon blends cleanly into track fog
     if (uv.y < horizon) {
         float belowT = clamp((horizon - uv.y) / horizon, 0.0, 1.0);
         col = mix(col, u_SkyFog, smoothstep(0.0, 0.25, belowT));
@@ -518,14 +525,21 @@ layout(location = 1) in vec2 a_TexCoord;
 layout(location = 2) in vec4 a_Color;
 
 uniform mat4 u_VP;
+uniform vec2 u_Curve;
 
 out vec2 v_UV;
 out vec4 v_Color;
 
 void main() {
+    vec4 wp = vec4(a_Position, 1.0);
+    float dz = max(0.0, wp.z);
+    float dz2 = dz * dz;
+    wp.x += u_Curve.x * dz2;
+    wp.y += u_Curve.y * dz2;
+
     v_UV = a_TexCoord;
     v_Color = a_Color;
-    gl_Position = u_VP * vec4(a_Position, 1.0);
+    gl_Position = u_VP * wp;
 }
 )";
 
@@ -541,11 +555,10 @@ out vec4 fragColor;
 
 void main() {
     if (u_Mode == 1) {
-        // Soft-edged neon energy ribbon
         float edge = 1.0 - abs(v_UV.x - 0.5) * 2.0;
         float core = smoothstep(0.0, 0.65, edge);
         float alpha = core * v_Color.a;
-        vec3 col = v_Color.rgb * (0.9 + 0.5 * core);
+        vec3 col = v_Color.rgb * (0.95 + 0.55 * core);
         fragColor = vec4(col, alpha);
         return;
     }
@@ -554,13 +567,11 @@ void main() {
     float d = length(p);
 
     if (u_Mode == 2) {
-        // Ground contact shadow
         float a = smoothstep(0.5, 0.08, d) * v_Color.a;
         fragColor = vec4(v_Color.rgb, a);
         return;
     }
 
-    // Radial additive spark glow
     float glow = smoothstep(0.5, 0.02, d);
     fragColor = vec4(v_Color.rgb, v_Color.a * glow * glow);
 }
@@ -591,15 +602,17 @@ uniform vec4  u_BorderColor;
 uniform vec2  u_RectSize;
 uniform float u_Radius;
 uniform float u_BorderWidth;
-uniform int   u_Mode; // 0 = Font, 1 = SDF Glass Panel, 2 = Fast Solid Quad
+uniform int   u_Mode; // 0 = Smooth Vector Font, 1 = SDF Glass Panel, 2 = Solid Quad
 uniform sampler2D u_Texture;
 
 out vec4 fragColor;
 
 void main() {
     if (u_Mode == 0) {
-        float fontAlpha = texture(u_Texture, v_UV).r;
-        fragColor = vec4(u_Color.rgb, u_Color.a * fontAlpha);
+        float alpha = texture(u_Texture, v_UV).r;
+        // Crisp SDF-like anti-aliased edge enhancement
+        float crisp = smoothstep(0.28, 0.62, alpha);
+        fragColor = vec4(u_Color.rgb, u_Color.a * crisp);
         return;
     }
 
@@ -608,7 +621,6 @@ void main() {
         return;
     }
 
-    // SDF Rounded Glassmorphic Panel with crisp glowing neon border
     vec2 halfSize = u_RectSize * 0.5;
     vec2 p = (v_UV - vec2(0.5)) * u_RectSize;
     float r = min(u_Radius, min(halfSize.x, halfSize.y));
@@ -618,14 +630,10 @@ void main() {
     float outerAA = 1.0 - smoothstep(-1.0, 0.8, dist);
     if (outerAA <= 0.001) discard;
 
-    // Vertical glassmorphic gradient (v_UV.y = 0 is top of quad, 1 is bottom)
     vec4 fill = mix(u_TopColor, u_Color, v_UV.y);
-
-    // Subtle top sheen highlight
-    float sheen = smoothstep(0.28, 0.0, v_UV.y) * 0.09;
+    float sheen = smoothstep(0.30, 0.0, v_UV.y) * 0.10;
     fill.rgb += vec3(sheen);
 
-    // Crisp neon border
     float borderMask = 0.0;
     if (u_BorderWidth > 0.01) {
         borderMask = smoothstep(-u_BorderWidth - 0.8, -u_BorderWidth + 0.6, dist);
@@ -637,13 +645,13 @@ void main() {
 }
 )";
 
-// Inline build definitions
 inline bool SceneShader::build() {
     program_id = link_gl_program(SCENE_VERT_SRC, SCENE_FRAG_SRC);
     if (!program_id) return false;
-    loc_mvp          = glGetUniformLocation(program_id, "u_MVP");
+    loc_vp           = glGetUniformLocation(program_id, "u_VP");
     loc_model        = glGetUniformLocation(program_id, "u_Model");
     loc_inv_scale    = glGetUniformLocation(program_id, "u_InvScale");
+    loc_curve        = glGetUniformLocation(program_id, "u_Curve");
     loc_color        = glGetUniformLocation(program_id, "u_Color");
     loc_energy_color = glGetUniformLocation(program_id, "u_EnergyColor");
     loc_sky_color    = glGetUniformLocation(program_id, "u_SkyColor");
@@ -672,8 +680,9 @@ inline bool SkyShader::build() {
 inline bool ParticleShader::build() {
     program_id = link_gl_program(PARTICLE_VERT_SRC, PARTICLE_FRAG_SRC);
     if (!program_id) return false;
-    loc_vp   = glGetUniformLocation(program_id, "u_VP");
-    loc_mode = glGetUniformLocation(program_id, "u_Mode");
+    loc_vp    = glGetUniformLocation(program_id, "u_VP");
+    loc_curve = glGetUniformLocation(program_id, "u_Curve");
+    loc_mode  = glGetUniformLocation(program_id, "u_Mode");
     return true;
 }
 
